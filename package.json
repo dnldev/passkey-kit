@@ -1,6 +1,5 @@
 {
   "name": "passkey-kit-monorepo",
-  "private": true,
   "workspaces": [
     "packages/*"
   ],
