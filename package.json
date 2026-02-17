@@ -1,0 +1,11 @@
+{
+  "name": "passkey-kit-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "clean": "rm -rf packages/*/dist"
+  }
+}
