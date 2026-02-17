@@ -5,12 +5,20 @@
   "description": "Client-side WebAuthn passkey helpers for browser-based registration and authentication",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["webauthn", "passkey", "fido2", "authentication", "browser"],
+  "keywords": [
+    "webauthn",
+    "passkey",
+    "fido2",
+    "authentication",
+    "browser"
+  ],
   "license": "MIT",
   "dependencies": {
     "@simplewebauthn/browser": "^13.1.0"
