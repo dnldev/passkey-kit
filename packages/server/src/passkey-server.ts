@@ -5,6 +5,15 @@
  * happens here. The client NEVER generates challenges — that's the key security
  * fix over the old insecure pattern.
  *
+ * Supports two challenge persistence modes:
+ * 1. **Stateless** (default): Challenge is encrypted into a signed token returned
+ *    to the client. No server-side state required — works on Vercel, Cloudflare, etc.
+ * 2. **Stateful**: Challenge is stored in a ChallengeStore (memory, file, Redis, etc).
+ *    Use this when you need server-side challenge revocation.
+ *
+ * The mode is selected automatically: if `challengeStore` is provided in config,
+ * stateful mode is used. Otherwise, `encryptionKey` must be provided for stateless.
+ *
  * Flow:
  *   Registration: generateRegistrationOptions → client signs → verifyRegistration
  *   Authentication: generateAuthenticationOptions → client signs → verifyAuthentication
@@ -26,12 +35,11 @@ import { isoBase64URL } from '@simplewebauthn/server/helpers';
 import type {
   PasskeyServerConfig,
   StoredCredential,
-  ChallengeStore,
-  CredentialStore,
   RegistrationResult,
   AuthenticationResult,
   UserInfo,
 } from './types.js';
+import { sealChallengeToken, openChallengeToken } from './challenge-token.js';
 
 const DEFAULT_CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
 
@@ -39,9 +47,10 @@ export class PasskeyServer {
   private rpName: string;
   private rpId: string;
   private allowedOrigins: string[];
-  private challengeStore: ChallengeStore;
-  private credentialStore: CredentialStore;
+  private challengeStore?: PasskeyServerConfig['challengeStore'];
+  private credentialStore: PasskeyServerConfig['credentialStore'];
   private challengeTTL: number;
+  private encryptionKey?: string;
 
   constructor(config: PasskeyServerConfig) {
     this.rpName = config.rpName;
@@ -50,11 +59,20 @@ export class PasskeyServer {
     this.challengeStore = config.challengeStore;
     this.credentialStore = config.credentialStore;
     this.challengeTTL = config.challengeTTL ?? DEFAULT_CHALLENGE_TTL;
+    this.encryptionKey = config.encryptionKey;
+
+    if (!this.challengeStore && !this.encryptionKey) {
+      throw new Error(
+        'passkey-kit: Provide either `challengeStore` (stateful) or `encryptionKey` (stateless). ' +
+        'For serverless, set encryptionKey to a random 32+ character secret.'
+      );
+    }
   }
 
   /**
    * Step 1 of registration: Generate options for the client.
-   * Returns PublicKeyCredentialCreationOptions (JSON-serializable).
+   * Returns PublicKeyCredentialCreationOptions (JSON-serializable)
+   * plus a `challengeToken` for stateless verification.
    */
   async generateRegistrationOptions(user: UserInfo, opts?: {
     authenticatorAttachment?: 'platform' | 'cross-platform';
@@ -81,40 +99,63 @@ export class PasskeyServer {
       },
     });
 
-    // Store challenge for verification
-    await this.challengeStore.save(user.id, {
-      challenge: options.challenge,
-      userId: user.id,
-      expiresAt: Date.now() + this.challengeTTL,
-      type: 'registration',
-    });
+    let challengeToken: string | undefined;
 
-    return options;
+    if (this.challengeStore) {
+      // Stateful: persist challenge in store
+      await this.challengeStore.save(user.id, {
+        challenge: options.challenge,
+        userId: user.id,
+        expiresAt: Date.now() + this.challengeTTL,
+        type: 'registration',
+      });
+    } else {
+      // Stateless: encrypt challenge into token
+      challengeToken = sealChallengeToken({
+        challenge: options.challenge,
+        userId: user.id,
+        type: 'registration',
+        exp: Date.now() + this.challengeTTL,
+      }, this.encryptionKey!);
+    }
+
+    return { ...options, challengeToken };
   }
 
   /**
    * Step 2 of registration: Verify the client's attestation response.
-   * Returns the stored credential on success.
+   *
+   * @param userId - User ID
+   * @param response - WebAuthn attestation response from the browser
+   * @param credentialName - Human-readable name for this credential
+   * @param challengeToken - The opaque token from step 1 (stateless mode)
    */
   async verifyRegistration(
     userId: string,
     response: RegistrationResponseJSON,
     credentialName?: string,
+    challengeToken?: string,
   ): Promise<RegistrationResult> {
-    const storedChallenge = await this.challengeStore.consume(userId);
-    if (!storedChallenge) {
-      throw new Error('Challenge not found or expired');
-    }
-    if (storedChallenge.type !== 'registration') {
-      throw new Error('Challenge type mismatch');
-    }
-    if (Date.now() > storedChallenge.expiresAt) {
-      throw new Error('Challenge expired');
+    let expectedChallenge: string;
+
+    if (this.challengeStore) {
+      const storedChallenge = await this.challengeStore.consume(userId);
+      if (!storedChallenge) throw new Error('Challenge not found or expired');
+      if (storedChallenge.type !== 'registration') throw new Error('Challenge type mismatch');
+      if (Date.now() > storedChallenge.expiresAt) throw new Error('Challenge expired');
+      expectedChallenge = storedChallenge.challenge;
+    } else {
+      if (!challengeToken) throw new Error('challengeToken is required in stateless mode');
+      const payload = openChallengeToken(challengeToken, this.encryptionKey!);
+      if (!payload) throw new Error('Invalid or expired challenge token');
+      if (payload.type !== 'registration') throw new Error('Challenge type mismatch');
+      if (payload.userId !== userId) throw new Error('Challenge userId mismatch');
+      expectedChallenge = payload.challenge;
     }
 
     const verification = await verifyRegistrationResponse({
       response,
-      expectedChallenge: storedChallenge.challenge,
+      expectedChallenge,
       expectedOrigin: this.allowedOrigins,
       expectedRPID: this.rpId,
     });
@@ -123,8 +164,7 @@ export class PasskeyServer {
       throw new Error('Registration verification failed');
     }
 
-    const { credential, credentialDeviceType, credentialBackedUp } =
-      verification.registrationInfo;
+    const { credential } = verification.registrationInfo;
 
     const storedCredential: StoredCredential = {
       credentialId: credential.id,
@@ -165,17 +205,30 @@ export class PasskeyServer {
       userVerification: opts?.userVerification ?? 'preferred',
     });
 
-    // Use a session key — for auth, userId may be unknown so use challenge itself
-    const sessionKey = userId ?? `auth:${options.challenge}`;
-    await this.challengeStore.save(sessionKey, {
-      challenge: options.challenge,
-      userId,
-      expiresAt: Date.now() + this.challengeTTL,
-      type: 'authentication',
-    });
+    let sessionKey: string;
+    let challengeToken: string | undefined;
 
-    // Return sessionKey so client can pass it back during verification
-    return { options, sessionKey };
+    if (this.challengeStore) {
+      // Stateful: persist challenge
+      sessionKey = userId ?? `auth:${options.challenge}`;
+      await this.challengeStore.save(sessionKey, {
+        challenge: options.challenge,
+        userId,
+        expiresAt: Date.now() + this.challengeTTL,
+        type: 'authentication',
+      });
+    } else {
+      // Stateless: encrypt into token (sessionKey IS the token)
+      challengeToken = sealChallengeToken({
+        challenge: options.challenge,
+        userId,
+        type: 'authentication',
+        exp: Date.now() + this.challengeTTL,
+      }, this.encryptionKey!);
+      sessionKey = challengeToken;
+    }
+
+    return { options, sessionKey, challengeToken };
   }
 
   /**
@@ -185,15 +238,20 @@ export class PasskeyServer {
     sessionKey: string,
     response: AuthenticationResponseJSON,
   ): Promise<AuthenticationResult> {
-    const storedChallenge = await this.challengeStore.consume(sessionKey);
-    if (!storedChallenge) {
-      throw new Error('Challenge not found or expired');
-    }
-    if (storedChallenge.type !== 'authentication') {
-      throw new Error('Challenge type mismatch');
-    }
-    if (Date.now() > storedChallenge.expiresAt) {
-      throw new Error('Challenge expired');
+    let expectedChallenge: string;
+
+    if (this.challengeStore) {
+      const storedChallenge = await this.challengeStore.consume(sessionKey);
+      if (!storedChallenge) throw new Error('Challenge not found or expired');
+      if (storedChallenge.type !== 'authentication') throw new Error('Challenge type mismatch');
+      if (Date.now() > storedChallenge.expiresAt) throw new Error('Challenge expired');
+      expectedChallenge = storedChallenge.challenge;
+    } else {
+      // In stateless mode, sessionKey IS the challengeToken
+      const payload = openChallengeToken(sessionKey, this.encryptionKey!);
+      if (!payload) throw new Error('Invalid or expired challenge token');
+      if (payload.type !== 'authentication') throw new Error('Challenge type mismatch');
+      expectedChallenge = payload.challenge;
     }
 
     const credentialId = response.id;
@@ -204,7 +262,7 @@ export class PasskeyServer {
 
     const verification = await verifyAuthenticationResponse({
       response,
-      expectedChallenge: storedChallenge.challenge,
+      expectedChallenge,
       expectedOrigin: this.allowedOrigins,
       expectedRPID: this.rpId,
       credential: {

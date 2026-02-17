@@ -16,12 +16,21 @@ export interface PasskeyServerConfig {
   rpId: string;
   /** Allowed origins for WebAuthn (e.g. ["https://movies.danieltech.dev"]) */
   allowedOrigins: string[];
-  /** Challenge store implementation */
-  challengeStore: ChallengeStore;
+  /**
+   * Challenge store implementation (stateful mode).
+   * If omitted, stateless mode is used instead (requires `encryptionKey`).
+   */
+  challengeStore?: ChallengeStore;
   /** Credential store implementation */
   credentialStore: CredentialStore;
   /** Challenge TTL in ms (default: 5 minutes) */
   challengeTTL?: number;
+  /**
+   * Secret key for stateless challenge tokens (AES-256-GCM).
+   * Required when `challengeStore` is not provided.
+   * Must be at least 32 characters. Derive from env: process.env.PASSKEY_SECRET
+   */
+  encryptionKey?: string;
 }
 
 /** A stored WebAuthn credential (persisted per-user) */

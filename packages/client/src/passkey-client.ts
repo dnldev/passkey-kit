@@ -90,10 +90,13 @@ export class PasskeyClient {
     },
   ): Promise<{ verified: boolean; credentialId: string; credentialName: string }> {
     // Step 1: Get registration options from server
-    const options = (await this.post('/register/options', {
+    const serverResponse = (await this.post('/register/options', {
       userId,
       ...opts,
-    })) as Parameters<typeof startRegistration>[0];
+    })) as Parameters<typeof startRegistration>[0] & { challengeToken?: string };
+
+    // Extract challengeToken before passing to WebAuthn (it's not a WebAuthn field)
+    const { challengeToken, ...options } = serverResponse;
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
     const attestationResponse = await startRegistration(options);
@@ -103,6 +106,7 @@ export class PasskeyClient {
       userId,
       response: attestationResponse,
       credentialName,
+      challengeToken,
     });
 
     return result as { verified: boolean; credentialId: string; credentialName: string };
@@ -125,12 +129,12 @@ export class PasskeyClient {
     const { options, sessionKey } = (await this.post('/authenticate/options', {
       userId,
       ...opts,
-    })) as { options: Parameters<typeof startAuthentication>[0]; sessionKey: string };
+    })) as { options: Parameters<typeof startAuthentication>[0]; sessionKey: string; challengeToken?: string };
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
     const assertionResponse = await startAuthentication(options);
 
-    // Step 3: Send assertion to server for verification
+    // Step 3: Send assertion to server for verification (sessionKey IS the challengeToken in stateless mode)
     const result = await this.post('/authenticate/verify', {
       sessionKey,
       response: assertionResponse,

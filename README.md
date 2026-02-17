@@ -1,6 +1,6 @@
 # passkey-kit
 
-Server-verified WebAuthn passkey authentication library with argon2 password hashing.
+Server-verified WebAuthn passkey authentication library. **Stateless by default** — works on Vercel, Cloudflare Workers, and traditional servers. Zero native dependencies.
 
 Replaces insecure client-side challenge generation with a proper server-side challenge-response pattern using [@simplewebauthn](https://simplewebauthn.dev/).
 
@@ -8,7 +8,7 @@ Replaces insecure client-side challenge generation with a proper server-side cha
 
 | Package | Description |
 |---------|-------------|
-| `@passkey-kit/server` | Server-side challenge generation, attestation/assertion verification, argon2 hashing |
+| `@passkey-kit/server` | Challenge generation, attestation/assertion verification, scrypt password hashing |
 | `@passkey-kit/client` | Browser-side WebAuthn ceremony handler (works with any framework) |
 
 ## Why?
@@ -16,49 +16,57 @@ Replaces insecure client-side challenge generation with a proper server-side cha
 The old pattern (used across several projects) was **insecure**:
 - Challenge was generated client-side (`crypto.getRandomValues`) — attacker can forge
 - No server-side signature verification — passkey presence ≠ identity proof
-- PBKDF2 with 10K iterations — outdated, argon2id is recommended
+- PBKDF2 with 10K iterations — outdated
 
 This library fixes all three issues.
 
+## Features
+
+- **Stateless mode** (default): Challenges encrypted into signed tokens (AES-256-GCM) — no database or memory store needed. Set one secret key and deploy anywhere.
+- **Stateful mode**: Bring your own `ChallengeStore` (memory, file, Redis) for traditional servers.
+- **Pure JS**: No native C++ bindings. Uses `@noble/hashes` (Trail of Bits audited) for scrypt.
+- **Optional argon2**: Import from `@passkey-kit/server/argon2` if you want native argon2id.
+
 ## Quick Start
 
-### Server (Express)
+### Stateless Server (Serverless / Vercel / Cloudflare)
 
 ```typescript
-import {
-  PasskeyServer,
-  createExpressRoutes,
-  MemoryChallengeStore,
-  FileCredentialStore,
-  hashPassword,
-  verifyPassword,
-} from '@passkey-kit/server';
+import { PasskeyServer, FileCredentialStore } from '@passkey-kit/server';
+import { createExpressRoutes } from '@passkey-kit/server/express';
 
-const passkeyServer = new PasskeyServer({
+const server = new PasskeyServer({
   rpName: 'My App',
   rpId: 'myapp.example.com',
   allowedOrigins: ['https://myapp.example.com'],
-  challengeStore: new MemoryChallengeStore(),
+  encryptionKey: process.env.PASSKEY_SECRET!, // 32+ char secret
   credentialStore: new FileCredentialStore('./data/credentials.json'),
 });
 
 // Mount ready-made Express routes
-const routes = createExpressRoutes(passkeyServer, {
+app.use('/api/auth/passkey', createExpressRoutes(server, {
   getUserInfo: async (userId) => {
     const user = await db.getUser(userId);
     return user ? { id: user.id, name: user.name } : null;
   },
   onAuthenticationSuccess: async (userId) => {
-    const token = generateSessionToken();
-    return { token }; // merged into response JSON
+    return { token: generateSessionToken() };
   },
+}));
+```
+
+### Stateful Server (Traditional)
+
+```typescript
+import { PasskeyServer, MemoryChallengeStore, FileCredentialStore } from '@passkey-kit/server';
+
+const server = new PasskeyServer({
+  rpName: 'My App',
+  rpId: 'myapp.example.com',
+  allowedOrigins: ['https://myapp.example.com'],
+  challengeStore: new MemoryChallengeStore(), // or Redis, Firestore, etc.
+  credentialStore: new FileCredentialStore('./data/credentials.json'),
 });
-
-app.use('/api/auth/passkey', routes);
-
-// Password hashing (argon2id)
-const hash = await hashPassword('my-passphrase');
-const valid = await verifyPassword(hash, 'my-passphrase');
 ```
 
 ### Client (Browser)
@@ -79,50 +87,72 @@ if (isWebAuthnAvailable()) {
 // Authenticate
 const auth = await client.authenticate();
 console.log('Authenticated as:', auth.userId);
-// auth also contains any extras from onAuthenticationSuccess (e.g. token)
 ```
+
+The client automatically handles `challengeToken` round-tripping for stateless servers — no extra config needed.
 
 ## Architecture
 
+### Stateless (default)
+
 ```
-┌─────────────┐         ┌──────────────────┐
-│   Browser    │         │     Server       │
-│              │         │                  │
-│ PasskeyClient│──POST──▶│ /register/options │
-│              │◀────────│ (challenge)       │
-│              │         │                  │
-│ WebAuthn API │         │                  │
-│ (browser     │──POST──▶│ /register/verify  │
-│  prompt)     │◀────────│ (verified: true)  │
-│              │         │                  │
-│              │──POST──▶│ /authenticate/    │
-│              │◀────────│  options          │
-│              │         │                  │
-│ WebAuthn API │──POST──▶│ /authenticate/    │
-│              │◀────────│  verify           │
-└─────────────┘         └──────────────────┘
+Client                            Server
+  │                                  │
+  │── POST /register/options ──────▶│ Generate challenge
+  │◀── { options, challengeToken } ──│ Seal challenge into AES-256-GCM token
+  │                                  │
+  │── WebAuthn ceremony (browser) ──│
+  │                                  │
+  │── POST /register/verify ───────▶│ Open token, verify attestation
+  │   { response, challengeToken }   │ No DB lookup needed
+  │◀── { verified: true } ──────────│
 ```
+
+The `challengeToken` is an encrypted, signed, expiring token. The server needs only the secret key to verify it — zero state.
+
+### Stateful (bring your ChallengeStore)
+
+Same flow, but challenges are stored in your database/cache instead of encrypted tokens.
+
+## Password Hashing
+
+Default uses **scrypt** (pure JS, works everywhere):
+
+```typescript
+import { hashPassword, verifyPassword, needsRehash } from '@passkey-kit/server';
+
+const hash = await hashPassword('my-passphrase');
+// $scrypt$ln=17,r=8,p=1$<salt>$<hash>
+
+const valid = await verifyPassword(hash, 'my-passphrase'); // true
+
+if (needsRehash(hash)) {
+  // Params changed since this hash was created — rehash on next login
+}
+```
+
+### argon2 (optional, requires native bindings)
+
+```typescript
+import { hashPassword, verifyPassword } from '@passkey-kit/server/argon2';
+
+const hash = await hashPassword('my-passphrase');
+// $argon2id$v=19$m=65536,t=3,p=4$...
+```
+
+Install argon2 as a peer dependency: `npm install argon2`
 
 ## Storage Backends
 
-The library uses a storage abstraction — implement `ChallengeStore` and `CredentialStore` for your backend:
+### Built-in
 
-### Built-in stores
-
-- **`MemoryChallengeStore`** — In-memory, auto-expiring. Good for single-process servers.
-- **`MemoryCredentialStore`** — In-memory. Good for development.
-- **`FileChallengeStore`** — JSON file. Good for single-server apps.
-- **`FileCredentialStore`** — JSON file. Good for single-server apps like MovieBox.
+- **`MemoryChallengeStore`** / **`MemoryCredentialStore`** — In-memory. Good for dev.
+- **`FileChallengeStore`** / **`FileCredentialStore`** — JSON file. Good for single-server.
 
 ### Custom stores
 
 ```typescript
-import type { ChallengeStore, CredentialStore } from '@passkey-kit/server';
-
-class FirestoreChallengeStore implements ChallengeStore {
-  async save(key, challenge) { /* ... */ }
-  async consume(key) { /* ... */ }
-}
+import type { CredentialStore } from '@passkey-kit/server';
 
 class FirestoreCredentialStore implements CredentialStore {
   async save(credential) { /* ... */ }
@@ -133,26 +163,25 @@ class FirestoreCredentialStore implements CredentialStore {
 }
 ```
 
-## Password Hashing
+In stateless mode, you don't need a `ChallengeStore` at all.
 
-Server-side argon2id hashing (replaces PBKDF2):
+## Multi-App Server
+
+Use `extraBody` on the client to send app-specific data:
 
 ```typescript
-import { hashPassword, verifyPassword } from '@passkey-kit/server';
-
-// Hash
-const hash = await hashPassword('my-passphrase');
-// $argon2id$v=19$m=65536,t=3,p=4$...
-
-// Verify
-const valid = await verifyPassword(hash, 'my-passphrase'); // true
-
-// With custom params
-const strongHash = await hashPassword('passphrase', {
-  memoryCost: 131072, // 128 MB
-  timeCost: 4,
-  parallelism: 8,
+const client = new PasskeyClient({
+  serverUrl: 'https://shared-auth.example.com/api/passkey',
+  extraBody: { rpId: 'myapp.com', rpName: 'My App' },
 });
+```
+
+## Testing
+
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode
+npm run test:coverage # With coverage
 ```
 
 ## License

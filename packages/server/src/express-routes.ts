@@ -55,6 +55,7 @@ export function createExpressRoutes(
   /**
    * POST /register/options
    * Body: { userId: string, authenticatorAttachment?: 'platform' | 'cross-platform' }
+   * Response includes `challengeToken` in stateless mode.
    */
   router.post('/register/options', async (req: Request, res: Response) => {
     try {
@@ -85,17 +86,18 @@ export function createExpressRoutes(
 
   /**
    * POST /register/verify
-   * Body: { userId: string, response: RegistrationResponseJSON, credentialName?: string }
+   * Body: { userId: string, response: RegistrationResponseJSON, credentialName?: string, challengeToken?: string }
+   * `challengeToken` is required in stateless mode.
    */
   router.post('/register/verify', async (req: Request, res: Response) => {
     try {
-      const { userId, response, credentialName } = req.body;
+      const { userId, response, credentialName, challengeToken } = req.body;
       if (!userId || !response) {
         res.status(400).json({ error: 'userId and response are required' });
         return;
       }
 
-      const result = await server.verifyRegistration(userId, response, credentialName);
+      const result = await server.verifyRegistration(userId, response, credentialName, challengeToken);
 
       if (config.onRegistrationSuccess) {
         await config.onRegistrationSuccess(userId, result.credential.credentialId);
@@ -116,18 +118,18 @@ export function createExpressRoutes(
   /**
    * POST /authenticate/options
    * Body: { userId?: string }
-   * userId is optional — omit for discoverable credential (resident key) flow
+   * Response includes `sessionKey` (which IS the challengeToken in stateless mode).
    */
   router.post('/authenticate/options', async (req: Request, res: Response) => {
     try {
       const { userId, userVerification } = req.body;
 
-      const { options, sessionKey } = await server.generateAuthenticationOptions(
+      const { options, sessionKey, challengeToken } = await server.generateAuthenticationOptions(
         userId,
         { userVerification },
       );
 
-      res.json({ options, sessionKey });
+      res.json({ options, sessionKey, challengeToken });
     } catch (err) {
       console.error('[passkey-kit] Authentication options error:', err);
       res.status(500).json({ error: 'Failed to generate authentication options' });
