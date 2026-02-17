@@ -1,7 +1,7 @@
 {
   "name": "@passkeykit/server",
-  "version": "2.0.1",
-  "description": "Server-side WebAuthn passkey verification \u2014 stateless or stateful, pure JS, works on serverless",
+  "version": "2.0.2",
+  "description": "Server-side WebAuthn passkey verification — stateless or stateful, pure JS, works on serverless",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/index.d.ts",
