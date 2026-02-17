@@ -13,7 +13,7 @@
  */
 
 import { scrypt as scryptSync } from '@noble/hashes/scrypt';
-import { randomBytes } from 'crypto';
+import { randomBytes, timingSafeEqual as tse } from 'crypto';
 
 /** Default scrypt parameters (OWASP recommendations for interactive login) */
 const DEFAULTS = {
@@ -105,6 +105,5 @@ function parsePhc(phc: string): { N: number; r: number; p: number; salt: Buffer;
 
 function timingSafeEqual(a: Buffer, b: Buffer): boolean {
   if (a.length !== b.length) return false;
-  const { timingSafeEqual: tse } = require('crypto');
   return tse(a, b);
 }
