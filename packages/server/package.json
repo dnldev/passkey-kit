@@ -1,6 +1,6 @@
 {
   "name": "@passkeykit/server",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Server-side WebAuthn passkey verification \u2014 stateless or stateful, pure JS, works on serverless",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
@@ -23,8 +23,18 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnldev/passkey-kit.git",
+    "directory": "packages/server"
+  },
+  "homepage": "https://github.com/dnldev/passkey-kit/tree/main/packages/server#readme",
+  "bugs": {
+    "url": "https://github.com/dnldev/passkey-kit/issues"
+  },
   "scripts": {
     "build": "tsc && tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "prepublishOnly": "npm run build"

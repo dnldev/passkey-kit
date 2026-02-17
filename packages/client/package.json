@@ -1,13 +1,23 @@
 {
   "name": "@passkeykit/client",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Client-side WebAuthn passkey helpers for browser-based registration and authentication",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnldev/passkey-kit.git",
+    "directory": "packages/client"
+  },
+  "homepage": "https://github.com/dnldev/passkey-kit/tree/main/packages/client#readme",
+  "bugs": {
+    "url": "https://github.com/dnldev/passkey-kit/issues"
+  },
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
