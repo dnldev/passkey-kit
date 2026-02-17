@@ -9,15 +9,14 @@
  * Client never sees raw challenges — only attestation/assertion responses.
  */
 
-export { PasskeyServer } from './passkey-server';
-export { createExpressRoutes } from './express-routes';
-export { hashPassword, verifyPassword } from './password';
+export { PasskeyServer } from './passkey-server.js';
+export { hashPassword, verifyPassword } from './password.js';
 export {
   MemoryChallengeStore,
   MemoryCredentialStore,
   FileChallengeStore,
   FileCredentialStore,
-} from './stores';
+} from './stores.js';
 export type {
   PasskeyServerConfig,
   StoredCredential,
@@ -27,4 +26,4 @@ export type {
   RegistrationResult,
   AuthenticationResult,
   UserInfo,
-} from './types';
+} from './types.js';

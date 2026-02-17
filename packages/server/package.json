@@ -3,10 +3,30 @@
   "version": "1.0.0",
   "description": "Server-side WebAuthn passkey verification with challenge-response and argon2 password hashing",
   "main": "dist/index.js",
+  "module": "dist/esm/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/esm/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./express": {
+      "import": "./dist/esm/express-routes.js",
+      "require": "./dist/express-routes.js",
+      "types": "./dist/express-routes.d.ts"
+    }
+  },
   "files": ["dist"],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && tsc -p tsconfig.esm.json && echo '{\"type\":\"module\"}' > dist/esm/package.json",
     "prepublishOnly": "npm run build"
   },
   "keywords": ["webauthn", "passkey", "fido2", "authentication", "argon2"],

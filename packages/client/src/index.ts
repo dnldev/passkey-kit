@@ -9,6 +9,6 @@
  * difference from the old insecure pattern.
  */
 
-export { PasskeyClient } from './passkey-client';
-export type { PasskeyClientConfig } from './passkey-client';
-export { isWebAuthnAvailable, isPlatformAuthenticatorAvailable } from './detect';
+export { PasskeyClient } from './passkey-client.js';
+export type { PasskeyClientConfig } from './passkey-client.js';
+export { isWebAuthnAvailable, isPlatformAuthenticatorAvailable } from './detect.js';

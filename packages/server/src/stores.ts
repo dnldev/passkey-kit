@@ -8,7 +8,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { dirname } from 'path';
-import type { ChallengeStore, CredentialStore, StoredChallenge, StoredCredential } from './types';
+import type { ChallengeStore, CredentialStore, StoredChallenge, StoredCredential } from './types.js';
 
 // ============================================================
 // In-Memory Stores (good for development and single-process)

@@ -31,7 +31,7 @@ import type {
   RegistrationResult,
   AuthenticationResult,
   UserInfo,
-} from './types';
+} from './types.js';
 
 const DEFAULT_CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
 

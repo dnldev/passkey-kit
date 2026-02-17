@@ -12,8 +12,8 @@
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { PasskeyServer } from './passkey-server';
-import type { UserInfo } from './types';
+import { PasskeyServer } from './passkey-server.js';
+import type { UserInfo } from './types.js';
 
 export interface ExpressRoutesConfig {
   /**

@@ -34,27 +34,36 @@ export interface PasskeyClientConfig {
    * Optional headers to include in every request (e.g. Bearer token).
    */
   headers?: Record<string, string>;
+
+  /**
+   * Optional extra fields to include in every request body.
+   * Useful for multi-app servers that need rpId/rpName per request.
+   */
+  extraBody?: Record<string, unknown>;
 }
 
 export class PasskeyClient {
   private serverUrl: string;
   private fetchFn: typeof globalThis.fetch;
   private headers: Record<string, string>;
+  private extraBody: Record<string, unknown>;
 
   constructor(config: PasskeyClientConfig) {
     this.serverUrl = config.serverUrl.replace(/\/$/, '');
     this.fetchFn = config.fetch ?? globalThis.fetch.bind(globalThis);
     this.headers = config.headers ?? {};
+    this.extraBody = config.extraBody ?? {};
   }
 
   private async post(path: string, body: unknown): Promise<unknown> {
+    const mergedBody = { ...this.extraBody, ...(body as Record<string, unknown>) };
     const res = await this.fetchFn(`${this.serverUrl}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...this.headers,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify(mergedBody),
     });
     const data = await res.json();
     if (!res.ok) {
