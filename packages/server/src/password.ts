@@ -6,7 +6,7 @@
  * Node.js, Deno, Bun, Cloudflare Workers, Vercel Edge, browser.
  *
  * For users who want argon2id (requires native bindings), see the
- * `@passkey-kit/server/argon2` subpath export.
+ * `@passkeykit/server/argon2` subpath export.
  *
  * Output format is PHC-like:
  *   $scrypt$ln=17,r=8,p=1$<base64salt>$<base64hash>

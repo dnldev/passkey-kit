@@ -5,7 +5,7 @@
  * 1. Run on a platform with native module support (Node.js, not serverless edge)
  * 2. Want the absolute strongest password hash (argon2id > scrypt)
  *
- * Import: import { hashPassword, verifyPassword } from '@passkey-kit/server/argon2'
+ * Import: import { hashPassword, verifyPassword } from '@passkeykit/server/argon2'
  *
  * Most users should use the default scrypt export which works everywhere.
  */

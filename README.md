@@ -8,8 +8,8 @@ Replaces insecure client-side challenge generation with a proper server-side cha
 
 | Package | Description |
 |---------|-------------|
-| `@passkey-kit/server` | Challenge generation, attestation/assertion verification, scrypt password hashing |
-| `@passkey-kit/client` | Browser-side WebAuthn ceremony handler (works with any framework) |
+| `@passkeykit/server` | Challenge generation, attestation/assertion verification, scrypt password hashing |
+| `@passkeykit/client` | Browser-side WebAuthn ceremony handler (works with any framework) |
 
 ## Why?
 
@@ -25,15 +25,15 @@ This library fixes all three issues.
 - **Stateless mode** (default): Challenges encrypted into signed tokens (AES-256-GCM) — no database or memory store needed. Set one secret key and deploy anywhere.
 - **Stateful mode**: Bring your own `ChallengeStore` (memory, file, Redis) for traditional servers.
 - **Pure JS**: No native C++ bindings. Uses `@noble/hashes` (Trail of Bits audited) for scrypt.
-- **Optional argon2**: Import from `@passkey-kit/server/argon2` if you want native argon2id.
+- **Optional argon2**: Import from `@passkeykit/server/argon2` if you want native argon2id.
 
 ## Quick Start
 
 ### Stateless Server (Serverless / Vercel / Cloudflare)
 
 ```typescript
-import { PasskeyServer, FileCredentialStore } from '@passkey-kit/server';
-import { createExpressRoutes } from '@passkey-kit/server/express';
+import { PasskeyServer, FileCredentialStore } from '@passkeykit/server';
+import { createExpressRoutes } from '@passkeykit/server/express';
 
 const server = new PasskeyServer({
   rpName: 'My App',
@@ -58,7 +58,7 @@ app.use('/api/auth/passkey', createExpressRoutes(server, {
 ### Stateful Server (Traditional)
 
 ```typescript
-import { PasskeyServer, MemoryChallengeStore, FileCredentialStore } from '@passkey-kit/server';
+import { PasskeyServer, MemoryChallengeStore, FileCredentialStore } from '@passkeykit/server';
 
 const server = new PasskeyServer({
   rpName: 'My App',
@@ -72,7 +72,7 @@ const server = new PasskeyServer({
 ### Client (Browser)
 
 ```typescript
-import { PasskeyClient, isWebAuthnAvailable } from '@passkey-kit/client';
+import { PasskeyClient, isWebAuthnAvailable } from '@passkeykit/client';
 
 const client = new PasskeyClient({
   serverUrl: '/api/auth/passkey',
@@ -119,7 +119,7 @@ Same flow, but challenges are stored in your database/cache instead of encrypted
 Default uses **scrypt** (pure JS, works everywhere):
 
 ```typescript
-import { hashPassword, verifyPassword, needsRehash } from '@passkey-kit/server';
+import { hashPassword, verifyPassword, needsRehash } from '@passkeykit/server';
 
 const hash = await hashPassword('my-passphrase');
 // $scrypt$ln=17,r=8,p=1$<salt>$<hash>
@@ -134,7 +134,7 @@ if (needsRehash(hash)) {
 ### argon2 (optional, requires native bindings)
 
 ```typescript
-import { hashPassword, verifyPassword } from '@passkey-kit/server/argon2';
+import { hashPassword, verifyPassword } from '@passkeykit/server/argon2';
 
 const hash = await hashPassword('my-passphrase');
 // $argon2id$v=19$m=65536,t=3,p=4$...
@@ -152,7 +152,7 @@ Install argon2 as a peer dependency: `npm install argon2`
 ### Custom stores
 
 ```typescript
-import type { CredentialStore } from '@passkey-kit/server';
+import type { CredentialStore } from '@passkeykit/server';
 
 class FirestoreCredentialStore implements CredentialStore {
   async save(credential) { /* ... */ }

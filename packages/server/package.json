@@ -1,5 +1,5 @@
 {
-  "name": "@passkey-kit/server",
+  "name": "@passkeykit/server",
   "version": "2.0.0",
   "description": "Server-side WebAuthn passkey verification \u2014 stateless or stateful, pure JS, works on serverless",
   "main": "dist/index.js",

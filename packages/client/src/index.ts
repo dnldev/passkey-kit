@@ -1,7 +1,7 @@
 /**
- * @passkey-kit/client
+ * @passkeykit/client
  *
- * Client-side WebAuthn helpers that work with @passkey-kit/server.
+ * Client-side WebAuthn helpers that work with @passkeykit/server.
  * Uses @simplewebauthn/browser for the WebAuthn ceremony.
  *
  * @ai_context The client does NOT generate challenges — it receives them

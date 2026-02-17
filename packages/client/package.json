@@ -1,5 +1,5 @@
 {
-  "name": "@passkey-kit/client",
+  "name": "@passkeykit/client",
   "version": "1.0.0",
   "type": "module",
   "description": "Client-side WebAuthn passkey helpers for browser-based registration and authentication",

@@ -1,5 +1,5 @@
 /**
- * Type definitions for @passkey-kit/server
+ * Type definitions for @passkeykit/server
  *
  * @ai_context These types define the storage interface abstraction.
  * Apps provide their own ChallengeStore and CredentialStore implementations

@@ -1,5 +1,5 @@
 /**
- * @passkey-kit/server
+ * @passkeykit/server
  *
  * Server-side WebAuthn passkey verification with challenge-response pattern
  * and scrypt password hashing (pure JS, works everywhere).
