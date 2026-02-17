@@ -92,6 +92,7 @@ export class PasskeyClient {
     // Step 1: Get registration options from server
     const serverResponse = (await this.post('/register/options', {
       userId,
+      userName: credentialName,
       ...opts,
     })) as Parameters<typeof startRegistration>[0] & { challengeToken?: string };
 
