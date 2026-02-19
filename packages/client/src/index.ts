@@ -11,4 +11,6 @@
 
 export { PasskeyClient } from './passkey-client.js';
 export type { PasskeyClientConfig } from './passkey-client.js';
+export { PasskeyError } from './errors.js';
+export type { PasskeyErrorCode } from './errors.js';
 export { isWebAuthnAvailable, isPlatformAuthenticatorAvailable } from './detect.js';

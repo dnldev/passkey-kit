@@ -50,7 +50,7 @@ export class PasskeyServer {
   private challengeStore?: PasskeyServerConfig['challengeStore'];
   private credentialStore: PasskeyServerConfig['credentialStore'];
   private challengeTTL: number;
-  private encryptionKey?: string;
+  private encryptionKey?: string | string[];
 
   constructor(config: PasskeyServerConfig) {
     this.rpName = config.rpName;
@@ -110,13 +110,14 @@ export class PasskeyServer {
         type: 'registration',
       });
     } else {
-      // Stateless: encrypt challenge into token
-      challengeToken = sealChallengeToken({
+      // Stateless: encrypt challenge into token (use first key for encryption)
+      const primaryKey = Array.isArray(this.encryptionKey) ? this.encryptionKey[0] : this.encryptionKey!;
+      challengeToken = await sealChallengeToken({
         challenge: options.challenge,
         userId: user.id,
         type: 'registration',
         exp: Date.now() + this.challengeTTL,
-      }, this.encryptionKey!);
+      }, primaryKey);
     }
 
     return { ...options, challengeToken };
@@ -146,7 +147,7 @@ export class PasskeyServer {
       expectedChallenge = storedChallenge.challenge;
     } else {
       if (!challengeToken) throw new Error('challengeToken is required in stateless mode');
-      const payload = openChallengeToken(challengeToken, this.encryptionKey!);
+      const payload = await openChallengeToken(challengeToken, this.encryptionKey!);
       if (!payload) throw new Error('Invalid or expired challenge token');
       if (payload.type !== 'registration') throw new Error('Challenge type mismatch');
       if (payload.userId !== userId) throw new Error('Challenge userId mismatch');
@@ -219,12 +220,13 @@ export class PasskeyServer {
       });
     } else {
       // Stateless: encrypt into token (sessionKey IS the token)
-      challengeToken = sealChallengeToken({
+      const primaryKey = Array.isArray(this.encryptionKey) ? this.encryptionKey[0] : this.encryptionKey!;
+      challengeToken = await sealChallengeToken({
         challenge: options.challenge,
         userId,
         type: 'authentication',
         exp: Date.now() + this.challengeTTL,
-      }, this.encryptionKey!);
+      }, primaryKey);
       sessionKey = challengeToken;
     }
 
@@ -248,7 +250,7 @@ export class PasskeyServer {
       expectedChallenge = storedChallenge.challenge;
     } else {
       // In stateless mode, sessionKey IS the challengeToken
-      const payload = openChallengeToken(sessionKey, this.encryptionKey!);
+      const payload = await openChallengeToken(sessionKey, this.encryptionKey!);
       if (!payload) throw new Error('Invalid or expired challenge token');
       if (payload.type !== 'authentication') throw new Error('Challenge type mismatch');
       expectedChallenge = payload.challenge;

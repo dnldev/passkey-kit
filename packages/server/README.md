@@ -215,7 +215,7 @@ interface PasskeyServerConfig {
   credentialStore: CredentialStore;
 
   // Stateless mode (default — pick one):
-  encryptionKey?: string;   // 32+ char secret for AES-256-GCM challenge tokens
+  encryptionKey?: string | string[];   // AES-256-GCM secret(s) — see Key Rotation below
 
   // Stateful mode (alternative):
   challengeStore?: ChallengeStore;
@@ -224,6 +224,36 @@ interface PasskeyServerConfig {
   challengeTTL?: number;    // Challenge expiry in ms (default: 5 minutes)
 }
 ```
+
+## Key Rotation
+
+Pass an array of keys to rotate secrets without breaking in-flight ceremonies:
+
+```typescript
+const server = new PasskeyServer({
+  // ...
+  encryptionKey: [
+    process.env.PASSKEY_SECRET_NEW!, // Current — used for encryption
+    process.env.PASSKEY_SECRET_OLD!, // Previous — still accepted for decryption
+  ],
+});
+```
+
+- **Encryption** always uses the **first** key.
+- **Decryption** tries each key in order until one succeeds.
+- Once all in-flight tokens have expired (default: 5 minutes), remove the old key.
+
+## Runtime Compatibility
+
+v3.0 uses the **Web Crypto API** (`crypto.subtle`) instead of `node:crypto`. This means the library runs natively on:
+
+- ✅ Node.js 18+
+- ✅ Deno
+- ✅ Bun
+- ✅ Cloudflare Workers
+- ✅ Vercel Edge Runtime
+
+> **Breaking change in v3.0:** `sealChallengeToken` and `openChallengeToken` are now **async** (return `Promise`). If you use PasskeyServer directly, this is handled internally. If you imported these functions directly, add `await`.
 
 ## Exports
 

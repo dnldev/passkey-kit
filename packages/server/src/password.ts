@@ -5,6 +5,8 @@
  * @noble/hashes is audited by Trail of Bits and works on every runtime:
  * Node.js, Deno, Bun, Cloudflare Workers, Vercel Edge, browser.
  *
+ * Uses Web Crypto API for random salt generation — no node:crypto dependency.
+ *
  * For users who want argon2id (requires native bindings), see the
  * `@passkeykit/server/argon2` subpath export.
  *
@@ -13,7 +15,6 @@
  */
 
 import { scrypt as scryptSync } from '@noble/hashes/scrypt';
-import { randomBytes, timingSafeEqual as tse } from 'crypto';
 
 /** Default scrypt parameters (OWASP recommendations for interactive login) */
 const DEFAULTS = {
@@ -33,6 +34,31 @@ export interface ScryptOptions {
   p?: number;
 }
 
+// --- Base64 helpers (no Buffer dependency) ---
+
+function uint8ToBase64(buf: Uint8Array): string {
+  const binStr = Array.from(buf, b => String.fromCharCode(b)).join('');
+  return btoa(binStr);
+}
+
+function base64ToUint8(str: string): Uint8Array {
+  const binStr = atob(str);
+  return Uint8Array.from(binStr, c => c.charCodeAt(0));
+}
+
+/**
+ * Constant-time comparison — prevents timing attacks on hash verification.
+ * Works on all runtimes (no node:crypto dependency).
+ */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i]! ^ b[i]!;
+  }
+  return result === 0;
+}
+
 /**
  * Hash a password using scrypt.
  * Returns a PHC-format string: $scrypt$ln=<log2N>,r=<r>,p=<p>$<salt>$<hash>
@@ -44,13 +70,13 @@ export async function hashPassword(
   const N = options?.N ?? DEFAULTS.N;
   const r = options?.r ?? DEFAULTS.r;
   const p = options?.p ?? DEFAULTS.p;
-  const salt = randomBytes(DEFAULTS.saltLen);
+  const salt = crypto.getRandomValues(new Uint8Array(DEFAULTS.saltLen));
 
   const hash = scryptSync(password, salt, { N, r, p, dkLen: DEFAULTS.dkLen });
 
   const ln = Math.log2(N);
-  const saltB64 = Buffer.from(salt).toString('base64');
-  const hashB64 = Buffer.from(hash).toString('base64');
+  const saltB64 = uint8ToBase64(salt);
+  const hashB64 = uint8ToBase64(hash);
   return `$scrypt$ln=${ln},r=${r},p=${p}$${saltB64}$${hashB64}`;
 }
 
@@ -67,7 +93,7 @@ export async function verifyPassword(
   const { N, r, p, salt, hash } = parsed;
   const derived = scryptSync(password, salt, { N, r, p, dkLen: hash.length });
 
-  return timingSafeEqual(Buffer.from(derived), hash);
+  return constantTimeEqual(new Uint8Array(derived), hash);
 }
 
 /**
@@ -89,7 +115,7 @@ export function needsRehash(
 
 // --- Internal helpers ---
 
-function parsePhc(phc: string): { N: number; r: number; p: number; salt: Buffer; hash: Buffer } | null {
+function parsePhc(phc: string): { N: number; r: number; p: number; salt: Uint8Array; hash: Uint8Array } | null {
   // $scrypt$ln=17,r=8,p=1$<salt>$<hash>
   const match = phc.match(/^\$scrypt\$ln=(\d+),r=(\d+),p=(\d+)\$([A-Za-z0-9+/=]+)\$([A-Za-z0-9+/=]+)$/);
   if (!match) return null;
@@ -98,12 +124,7 @@ function parsePhc(phc: string): { N: number; r: number; p: number; salt: Buffer;
     N: 2 ** parseInt(match[1], 10),
     r: parseInt(match[2], 10),
     p: parseInt(match[3], 10),
-    salt: Buffer.from(match[4], 'base64'),
-    hash: Buffer.from(match[5], 'base64'),
+    salt: base64ToUint8(match[4]),
+    hash: base64ToUint8(match[5]),
   };
-}
-
-function timingSafeEqual(a: Buffer, b: Buffer): boolean {
-  if (a.length !== b.length) return false;
-  return tse(a, b);
 }

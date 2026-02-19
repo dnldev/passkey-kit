@@ -26,11 +26,16 @@ export interface PasskeyServerConfig {
   /** Challenge TTL in ms (default: 5 minutes) */
   challengeTTL?: number;
   /**
-   * Secret key for stateless challenge tokens (AES-256-GCM).
+   * Secret key(s) for stateless challenge tokens (AES-256-GCM).
    * Required when `challengeStore` is not provided.
+   *
+   * **Key rotation:** Pass an array of secrets. The first key is used to encrypt
+   * new tokens. All keys are tried when decrypting, so you can rotate secrets
+   * without breaking in-flight registration/authentication flows.
+   *
    * Must be at least 32 characters. Derive from env: process.env.PASSKEY_SECRET
    */
-  encryptionKey?: string;
+  encryptionKey?: string | string[];
 }
 
 /** A stored WebAuthn credential (persisted per-user) */

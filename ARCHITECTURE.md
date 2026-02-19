@@ -32,6 +32,7 @@ passkey-kit/
 │       ├── src/
 │       │   ├── index.ts           # Main entry
 │       │   ├── passkey-client.ts   # PasskeyClient class (fetch + WebAuthn ceremony)
+│       │   ├── errors.ts          # Typed PasskeyError class with error codes
 │       │   └── detect.ts          # Feature detection utilities
 │       └── tests/                 # Vitest test suite
 │
@@ -100,11 +101,17 @@ Browser                              Server
 
 - **Challenges are server-generated** — the client never creates challenges
 - **AES-256-GCM** authenticated encryption for stateless tokens (confidentiality + integrity)
-- **HMAC-SHA256 key derivation** from the encryption secret (domain separation)
+- **HKDF-SHA256 key derivation** from the encryption secret via Web Crypto `deriveKey`
+- **Web Crypto API** — no `node:crypto` dependency; works on Node 18+, Deno, Bun, Cloudflare Workers, Vercel Edge
+- **Key rotation** — `encryptionKey` accepts `string | string[]`; encryption uses the first key, decryption tries all keys in order
 - **Challenge expiry** baked into tokens (default: 5 minutes)
 - **Counter verification** prevents credential cloning attacks
 - **Scrypt password hashing** with OWASP-recommended parameters (N=2^17, r=8, p=1)
-- **Timing-safe comparison** for password verification
+- **Constant-time comparison** via XOR (no `crypto.timingSafeEqual` dependency)
+
+### Client Error Typing
+
+The `@passkeykit/client` package throws typed `PasskeyError` instances instead of generic `Error`. Error codes (`USER_CANCELLED`, `SERVER_ERROR`, `NETWORK_ERROR`, `NOT_SUPPORTED`, `INVALID_RESPONSE`, `UNKNOWN`) allow consumers to handle "user closed the prompt" differently from real failures.
 
 ## Testing
 

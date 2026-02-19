@@ -116,6 +116,42 @@ const client = new PasskeyClient({
 
 When used with `@passkeykit/server` in stateless mode, the client automatically handles `challengeToken` round-tripping — no extra config needed. The token is returned by the server in the options response and sent back during verification.
 
+## Error Handling
+
+All errors thrown by the client are typed `PasskeyError` with machine-readable error codes:
+
+```typescript
+import { PasskeyClient, PasskeyError } from '@passkeykit/client';
+
+try {
+  await client.authenticate();
+} catch (err) {
+  if (err instanceof PasskeyError) {
+    if (err.isCancelled) {
+      // User closed the WebAuthn prompt — not a real error
+      return;
+    }
+    switch (err.code) {
+      case 'NETWORK_ERROR':  console.log('Check your connection'); break;
+      case 'SERVER_ERROR':   console.log(`Server: ${err.message} (${err.statusCode})`); break;
+      case 'NOT_SUPPORTED':  console.log('WebAuthn not available'); break;
+      default:               console.log('Unknown error:', err.message);
+    }
+  }
+}
+```
+
+**Error codes:**
+
+| Code | Meaning |
+|------|---------|
+| `USER_CANCELLED` | User closed the WebAuthn prompt |
+| `SERVER_ERROR` | HTTP error from the server (includes `statusCode`) |
+| `NETWORK_ERROR` | Fetch failed (offline, CORS, etc.) |
+| `NOT_SUPPORTED` | WebAuthn not supported or blocked by security policy |
+| `INVALID_RESPONSE` | Server returned unexpected data |
+| `UNKNOWN` | Unrecognized error |
+
 ## Server Pairing
 
 This package is designed to work with [`@passkeykit/server`](https://www.npmjs.com/package/@passkeykit/server), but it's compatible with any server that exposes:

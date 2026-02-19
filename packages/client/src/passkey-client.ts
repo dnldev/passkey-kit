@@ -16,6 +16,7 @@ import {
   startRegistration,
   startAuthentication,
 } from '@simplewebauthn/browser';
+import { PasskeyError } from './errors.js';
 
 export interface PasskeyClientConfig {
   /**
@@ -57,17 +58,29 @@ export class PasskeyClient {
 
   private async post(path: string, body: unknown): Promise<unknown> {
     const mergedBody = { ...this.extraBody, ...(body as Record<string, unknown>) };
-    const res = await this.fetchFn(`${this.serverUrl}${path}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.headers,
-      },
-      body: JSON.stringify(mergedBody),
-    });
+    let res: Response;
+    try {
+      res = await this.fetchFn(`${this.serverUrl}${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.headers,
+        },
+        body: JSON.stringify(mergedBody),
+      });
+    } catch (err) {
+      throw new PasskeyError(
+        'NETWORK_ERROR',
+        err instanceof Error ? err.message : 'Network request failed',
+      );
+    }
     const data = await res.json();
     if (!res.ok) {
-      throw new Error((data as { error?: string }).error ?? `HTTP ${res.status}`);
+      throw new PasskeyError(
+        'SERVER_ERROR',
+        (data as { error?: string }).error ?? `HTTP ${res.status}`,
+        res.status,
+      );
     }
     return data;
   }
@@ -100,7 +113,12 @@ export class PasskeyClient {
     const { challengeToken, ...options } = serverResponse;
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
-    const attestationResponse = await startRegistration(options);
+    let attestationResponse;
+    try {
+      attestationResponse = await startRegistration(options);
+    } catch (err) {
+      throw PasskeyError.fromWebAuthnError(err);
+    }
 
     // Step 3: Send attestation to server for verification
     const result = await this.post('/register/verify', {
@@ -133,7 +151,12 @@ export class PasskeyClient {
     })) as { options: Parameters<typeof startAuthentication>[0]; sessionKey: string; challengeToken?: string };
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
-    const assertionResponse = await startAuthentication(options);
+    let assertionResponse;
+    try {
+      assertionResponse = await startAuthentication(options);
+    } catch (err) {
+      throw PasskeyError.fromWebAuthnError(err);
+    }
 
     // Step 3: Send assertion to server for verification (sessionKey IS the challengeToken in stateless mode)
     const result = await this.post('/authenticate/verify', {

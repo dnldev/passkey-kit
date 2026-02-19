@@ -159,14 +159,22 @@ describe('PasskeyClient', () => {
   });
 
   describe('error handling', () => {
-    it('throws on HTTP error with server error message', async () => {
+    it('throws PasskeyError with SERVER_ERROR on HTTP error', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
         json: async () => ({ error: 'User not found' }),
       });
 
-      await expect(client.register('bad-user')).rejects.toThrow('User not found');
+      try {
+        await client.register('bad-user');
+        expect.fail('should have thrown');
+      } catch (err: any) {
+        expect(err.name).toBe('PasskeyError');
+        expect(err.code).toBe('SERVER_ERROR');
+        expect(err.message).toBe('User not found');
+        expect(err.statusCode).toBe(400);
+      }
     });
 
     it('throws with HTTP status when no error message', async () => {
@@ -176,7 +184,26 @@ describe('PasskeyClient', () => {
         json: async () => ({}),
       });
 
-      await expect(client.register('bad-user')).rejects.toThrow('HTTP 500');
+      try {
+        await client.register('bad-user');
+        expect.fail('should have thrown');
+      } catch (err: any) {
+        expect(err.code).toBe('SERVER_ERROR');
+        expect(err.message).toBe('HTTP 500');
+        expect(err.statusCode).toBe(500);
+      }
+    });
+
+    it('throws PasskeyError with NETWORK_ERROR on fetch failure', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      try {
+        await client.register('user');
+        expect.fail('should have thrown');
+      } catch (err: any) {
+        expect(err.code).toBe('NETWORK_ERROR');
+        expect(err.message).toBe('Failed to fetch');
+      }
     });
   });
 
