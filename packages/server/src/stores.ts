@@ -5,7 +5,8 @@
  * and CredentialStore interfaces with a shared backend (Redis, database, etc).
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { readFile, writeFile } from 'fs/promises';
+import { mkdirSync, existsSync } from 'fs';
 import { dirname } from 'path';
 import type { ChallengeStore, CredentialStore, StoredChallenge, StoredCredential } from './types.js';
 
@@ -75,35 +76,38 @@ export class FileChallengeStore implements ChallengeStore {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 
-  private load(): Record<string, StoredChallenge> {
+  private async load(): Promise<Record<string, StoredChallenge>> {
     try {
-      return JSON.parse(readFileSync(this.filePath, 'utf-8'));
-    } catch {
-      return {};
+      const raw = await readFile(this.filePath, 'utf-8');
+      return JSON.parse(raw);
+    } catch (err: any) {
+      // File not yet created — valid initial state
+      if (err?.code === 'ENOENT') return {};
+      // Anything else (permission denied, corrupted JSON) must surface
+      throw err;
     }
   }
 
-  private persist(data: Record<string, StoredChallenge>): void {
-    // Clean expired
+  private async persist(data: Record<string, StoredChallenge>): Promise<void> {
     const now = Date.now();
     for (const [key, val] of Object.entries(data)) {
       if (now > val.expiresAt) delete data[key];
     }
-    writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+    await writeFile(this.filePath, JSON.stringify(data, null, 2));
   }
 
   async save(key: string, challenge: StoredChallenge): Promise<void> {
-    const data = this.load();
+    const data = await this.load();
     data[key] = challenge;
-    this.persist(data);
+    await this.persist(data);
   }
 
   async consume(key: string): Promise<StoredChallenge | null> {
-    const data = this.load();
+    const data = await this.load();
     const challenge = data[key];
     if (!challenge) return null;
     delete data[key];
-    this.persist(data);
+    await this.persist(data);
     if (Date.now() > challenge.expiresAt) return null;
     return challenge;
   }
@@ -121,43 +125,45 @@ export class FileCredentialStore implements CredentialStore {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 
-  private load(): StoredCredential[] {
+  private async load(): Promise<StoredCredential[]> {
     try {
-      return JSON.parse(readFileSync(this.filePath, 'utf-8'));
-    } catch {
-      return [];
+      const raw = await readFile(this.filePath, 'utf-8');
+      return JSON.parse(raw);
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') return [];
+      throw err;
     }
   }
 
-  private persist(data: StoredCredential[]): void {
-    writeFileSync(this.filePath, JSON.stringify(data, null, 2));
+  private async persist(data: StoredCredential[]): Promise<void> {
+    await writeFile(this.filePath, JSON.stringify(data, null, 2));
   }
 
   async save(credential: StoredCredential): Promise<void> {
-    const data = this.load();
+    const data = await this.load();
     data.push(credential);
-    this.persist(data);
+    await this.persist(data);
   }
 
   async getByUserId(userId: string): Promise<StoredCredential[]> {
-    return this.load().filter(c => c.userId === userId);
+    return (await this.load()).filter(c => c.userId === userId);
   }
 
   async getByCredentialId(credentialId: string): Promise<StoredCredential | null> {
-    return this.load().find(c => c.credentialId === credentialId) ?? null;
+    return (await this.load()).find(c => c.credentialId === credentialId) ?? null;
   }
 
   async updateCounter(credentialId: string, newCounter: number): Promise<void> {
-    const data = this.load();
+    const data = await this.load();
     const cred = data.find(c => c.credentialId === credentialId);
     if (cred) {
       cred.counter = newCounter;
-      this.persist(data);
+      await this.persist(data);
     }
   }
 
   async delete(credentialId: string): Promise<void> {
-    const data = this.load().filter(c => c.credentialId !== credentialId);
-    this.persist(data);
+    const data = (await this.load()).filter(c => c.credentialId !== credentialId);
+    await this.persist(data);
   }
 }

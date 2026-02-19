@@ -72,6 +72,12 @@ describe('FileChallengeStore', () => {
     const nestedPath = join(TMP_DIR, 'nested', 'deep', 'challenges.json');
     expect(() => new FileChallengeStore(nestedPath)).not.toThrow();
   });
+
+  it('throws on corrupted JSON instead of silently resetting', async () => {
+    const { writeFileSync } = await import('fs');
+    writeFileSync(CHALLENGE_FILE, '{{not valid json!!!');
+    await expect(store.save('k1', challenge)).rejects.toThrow();
+  });
 });
 
 describe('FileCredentialStore', () => {
@@ -143,5 +149,11 @@ describe('FileCredentialStore', () => {
     const store2 = new FileCredentialStore(CREDENTIAL_FILE);
     const result = await store2.getByCredentialId('file-cred-1');
     expect(result).toEqual(cred);
+  });
+
+  it('throws on corrupted JSON instead of silently resetting', async () => {
+    const { writeFileSync } = await import('fs');
+    writeFileSync(CREDENTIAL_FILE, 'GARBAGE{{{{');
+    await expect(store.getByUserId('user-file-1')).rejects.toThrow();
   });
 });

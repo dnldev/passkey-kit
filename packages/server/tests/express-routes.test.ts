@@ -151,4 +151,45 @@ describe('createExpressRoutes', () => {
       expect(status).toBe(400);
     });
   });
+
+  describe('Zod validation', () => {
+    it('rejects register/options with non-string userId', async () => {
+      const { status, json } = await callRoute(router, 'POST', '/register/options', {
+        userId: 12345,
+      });
+      expect(status).toBe(400);
+      expect(json).toHaveProperty('details');
+    });
+
+    it('rejects register/options with unknown fields', async () => {
+      const { status, json } = await callRoute(router, 'POST', '/register/options', {
+        userId: 'user-1',
+        malicious: '<script>alert(1)</script>',
+      });
+      expect(status).toBe(400);
+    });
+
+    it('rejects register/verify with missing response.type', async () => {
+      const { status } = await callRoute(router, 'POST', '/register/verify', {
+        userId: 'user-1',
+        response: { id: 'x', rawId: 'x' },
+      });
+      expect(status).toBe(400);
+    });
+
+    it('rejects authenticate/verify with empty sessionKey', async () => {
+      const { status } = await callRoute(router, 'POST', '/authenticate/verify', {
+        sessionKey: '',
+        response: { id: 'x', rawId: 'x', type: 'public-key', response: {}, clientExtensionResults: {} },
+      });
+      expect(status).toBe(400);
+    });
+
+    it('rejects authenticate/options with invalid userVerification enum', async () => {
+      const { status } = await callRoute(router, 'POST', '/authenticate/options', {
+        userVerification: 'always',
+      });
+      expect(status).toBe(400);
+    });
+  });
 });
