@@ -1,6 +1,6 @@
 {
   "name": "@passkeykit/server",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "description": "Server-side WebAuthn passkey verification — stateless or stateful, pure JS, works on serverless",
   "main": "dist/index.js",
   "module": "dist/esm/index.js",
@@ -10,6 +10,11 @@
       "import": "./dist/esm/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./password": {
+      "import": "./dist/esm/password.js",
+      "require": "./dist/password.js",
+      "types": "./dist/password.d.ts"
     },
     "./express": {
       "import": "./dist/esm/express-routes.js",
@@ -49,14 +54,17 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@simplewebauthn/server": "^13.1.1",
     "@noble/hashes": "^1.7.0"
   },
   "peerDependencies": {
+    "@simplewebauthn/server": "^13.0.0",
     "express": "^4.0.0 || ^5.0.0",
     "argon2": "^0.41.0"
   },
   "peerDependenciesMeta": {
+    "@simplewebauthn/server": {
+      "optional": false
+    },
     "express": {
       "optional": true
     },

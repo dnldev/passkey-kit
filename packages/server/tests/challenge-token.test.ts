@@ -82,4 +82,39 @@ describe('challenge-token', () => {
       expect(result!.type).toBe('authentication');
     });
   });
+
+  describe('edge cases', () => {
+    it('handles very long challenge strings', () => {
+      const longChallenge = 'a'.repeat(10000);
+      const payload = { ...basePayload, challenge: longChallenge };
+      const token = sealChallengeToken(payload, SECRET);
+      const result = openChallengeToken(token, SECRET);
+      expect(result!.challenge).toBe(longChallenge);
+    });
+
+    it('handles unicode in userId', () => {
+      const payload = { ...basePayload, userId: '用户-ñoño-🔑' };
+      const token = sealChallengeToken(payload, SECRET);
+      const result = openChallengeToken(token, SECRET);
+      expect(result!.userId).toBe('用户-ñoño-🔑');
+    });
+
+    it('returns null for truncated token', () => {
+      const token = sealChallengeToken(basePayload, SECRET);
+      expect(openChallengeToken(token.slice(0, 10), SECRET)).toBeNull();
+    });
+
+    it('handles expiry at exact boundary', () => {
+      const payload = { ...basePayload, exp: Date.now() + 50 };
+      const token = sealChallengeToken(payload, SECRET);
+      // Should still be valid right away
+      expect(openChallengeToken(token, SECRET)).not.toBeNull();
+    });
+
+    it('works with minimum-length secret', () => {
+      const shortSecret = 'a';
+      const token = sealChallengeToken(basePayload, shortSecret);
+      expect(openChallengeToken(token, shortSecret)).toEqual(basePayload);
+    });
+  });
 });

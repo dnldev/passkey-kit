@@ -41,6 +41,15 @@ describe('MemoryChallengeStore', () => {
     const result = await store.consume('key1');
     expect(result!.challenge).toBe('updated');
   });
+  it('expired challenge returns null on consume', async () => {
+    const expired: StoredChallenge = {
+      ...challenge,
+      expiresAt: Date.now() - 1000,
+    };
+    await store.save('key-exp', expired);
+    const result = await store.consume('key-exp');
+    expect(result).toBeNull();
+  });
 });
 
 describe('MemoryCredentialStore', () => {
@@ -96,5 +105,27 @@ describe('MemoryCredentialStore', () => {
     await store.delete('cred-1');
     const result = await store.getByCredentialId('cred-1');
     expect(result).toBeNull();
+  });
+
+  it('delete only removes the targeted credential', async () => {
+    await store.save(cred);
+    const cred2 = { ...cred, credentialId: 'cred-2' };
+    await store.save(cred2);
+    await store.delete('cred-1');
+    expect(await store.getByCredentialId('cred-2')).not.toBeNull();
+    expect(await store.getByUserId('user-1')).toHaveLength(1);
+  });
+
+  it('updateCounter does nothing for missing credential', async () => {
+    await store.updateCounter('nonexistent', 99);
+    // No error thrown
+  });
+
+  it('getByUserId isolates users', async () => {
+    await store.save(cred);
+    const cred2 = { ...cred, credentialId: 'cred-2', userId: 'user-2' };
+    await store.save(cred2);
+    expect(await store.getByUserId('user-1')).toHaveLength(1);
+    expect(await store.getByUserId('user-2')).toHaveLength(1);
   });
 });

@@ -1,9 +1,8 @@
 /**
  * Built-in store implementations for common backends.
  *
- * @ai_context These are convenience implementations. For production with
- * multiple server instances, use a shared store (Redis, database, Firestore).
- * For single-server apps (like MovieBox, MediaBox), FileStore works great.
+ * For production with multiple server instances, implement the ChallengeStore
+ * and CredentialStore interfaces with a shared backend (Redis, database, etc).
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
@@ -65,7 +64,6 @@ export class MemoryCredentialStore implements CredentialStore {
  * File-based challenge store. Challenges are stored in a JSON file.
  * Auto-cleans expired challenges on every operation.
  *
- * @ai_context Used by MovieBox/MediaBox which store auth in auth.json.
  * Not suitable for multi-process servers (race conditions on file writes).
  */
 export class FileChallengeStore implements ChallengeStore {

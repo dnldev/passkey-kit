@@ -13,12 +13,12 @@ Replaces insecure client-side challenge generation with a proper server-side cha
 
 ## Why?
 
-The old pattern (used across several projects) was **insecure**:
-- Challenge was generated client-side (`crypto.getRandomValues`) — attacker can forge
-- No server-side signature verification — passkey presence ≠ identity proof
-- PBKDF2 with 10K iterations — outdated
+Many WebAuthn implementations have subtle security issues:
+- Challenge generated client-side (`crypto.getRandomValues`) — attackers can forge challenges
+- No server-side signature verification — passkey presence alone doesn't prove identity
+- Weak password hashing (e.g., PBKDF2 with low iterations)
 
-This library fixes all three issues.
+PasskeyKit fixes these issues with a proper server-side challenge-response pattern.
 
 ## Features
 

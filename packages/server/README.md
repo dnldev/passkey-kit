@@ -10,8 +10,18 @@ Handles challenge generation, attestation/assertion verification, and includes s
 ## Install
 
 ```bash
-npm install @passkeykit/server
+npm install @passkeykit/server @simplewebauthn/server
 ```
+
+> `@simplewebauthn/server` is a **peer dependency** — you control the version. This keeps the package itself lightweight while giving you full WebAuthn verification.
+>
+> **Password-only?** If you only need `hashPassword` / `verifyPassword`, import from the subpath — no WebAuthn dependency required:
+> ```bash
+> npm install @passkeykit/server
+> ```
+> ```typescript
+> import { hashPassword, verifyPassword } from '@passkeykit/server/password';
+> ```
 
 ## Quick Start
 
@@ -217,11 +227,12 @@ interface PasskeyServerConfig {
 
 ## Exports
 
-| Import Path | Contents |
-|-------------|----------|
-| `@passkeykit/server` | `PasskeyServer`, stores, password hashing, types |
-| `@passkeykit/server/express` | `createExpressRoutes()` — ready-made Express router |
-| `@passkeykit/server/argon2` | `hashPassword()`, `verifyPassword()` — native argon2id |
+| Import Path | Contents | Requires |
+|-------------|----------|----------|
+| `@passkeykit/server` | `PasskeyServer`, stores, password hashing, types | `@simplewebauthn/server` |
+| `@passkeykit/server/password` | `hashPassword()`, `verifyPassword()`, `needsRehash()` — scrypt | None (pure JS) |
+| `@passkeykit/server/express` | `createExpressRoutes()` — ready-made Express router | `express` |
+| `@passkeykit/server/argon2` | `hashPassword()`, `verifyPassword()` — native argon2id | `argon2` |
 
 ## Client Pairing
 

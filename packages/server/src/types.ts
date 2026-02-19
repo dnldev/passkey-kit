@@ -1,20 +1,20 @@
 /**
  * Type definitions for @passkeykit/server
  *
- * @ai_context These types define the storage interface abstraction.
+ * These types define the storage interface abstraction.
  * Apps provide their own ChallengeStore and CredentialStore implementations
- * so the library works with any backend (Firestore, file JSON, SQLite, etc).
+ * so the library works with any backend (Firestore, file JSON, SQLite, Redis, etc).
  */
 
 import type { AuthenticatorTransportFuture } from '@simplewebauthn/server';
 
 /** Configuration for PasskeyServer */
 export interface PasskeyServerConfig {
-  /** Relying Party name shown to users (e.g. "MovieBox", "SafeHarbor") */
+  /** Relying Party name shown to users (e.g. "My App") */
   rpName: string;
-  /** Relying Party ID — must be a valid domain (e.g. "movies.danieltech.dev") */
+  /** Relying Party ID — must be a valid domain (e.g. "auth.example.com") */
   rpId: string;
-  /** Allowed origins for WebAuthn (e.g. ["https://movies.danieltech.dev"]) */
+  /** Allowed origins for WebAuthn (e.g. ["https://example.com"]) */
   allowedOrigins: string[];
   /**
    * Challenge store implementation (stateful mode).
