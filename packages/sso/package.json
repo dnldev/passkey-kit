@@ -11,11 +11,18 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md"],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dnldev/passkey-kit.git",
+    "directory": "packages/sso"
+  },
+  "keywords": ["sso", "passkey", "webauthn", "session", "authentication"],
+  "license": "MIT",
   "publishConfig": {
     "access": "public"
   },

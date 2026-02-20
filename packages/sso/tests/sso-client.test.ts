@@ -239,4 +239,41 @@ describe("admin elevation", () => {
     sso.stepDown();
     expect(sso.isElevated()).toBe(false);
   });
+
+  it("isElevated returns false when elevation expired", () => {
+    const sso = makeSSOClient();
+    seedSession(sso, { role: "admin", elevated: true, elevatedUntil: Date.now() - 1000 });
+    expect(sso.isElevated()).toBe(false);
+  });
+
+  it("completeElevation returns false without pending flag", () => {
+    const sso = makeSSOClient();
+    seedSession(sso, { role: "admin" });
+    expect(sso.completeElevation()).toBe(false);
+  });
+
+  it("completeElevation returns false for non-admin", () => {
+    const sso = makeSSOClient();
+    seedSession(sso, { role: "member" });
+    store["sso_elevate_pending"] = "true";
+    expect(sso.completeElevation()).toBe(false);
+  });
+});
+
+describe("handleSSOCallback session duration", () => {
+  it("sets expires based on configured sessionDuration", async () => {
+    const duration = 7 * 24 * 60 * 60 * 1000; // 7 days
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        valid: true,
+        user: { id: "test", name: "Test", email: "t@t.com", role: "member" },
+      }),
+    });
+    const sso = makeSSOClient({ sessionDuration: duration });
+    const before = Date.now();
+    const session = await sso.handleSSOCallback("tok");
+    expect(session!.expires).toBeGreaterThanOrEqual(before + duration);
+    expect(session!.expires).toBeLessThanOrEqual(Date.now() + duration);
+  });
 });
