@@ -1,9 +1,9 @@
 /**
- * @passkeykit/sso — SSO client for DanielTech satellite apps.
+ * @passkeykit/sso — Configurable SSO client for browser-based apps.
  *
  * Usage:
  *   import { createSSOClient } from '@passkeykit/sso';
- *   const sso = createSSOClient({ verifyUrl: 'https://push.danieltech.dev/api/auth/sso-verify' });
+ *   const sso = createSSOClient({ verifyUrl: 'https://your-sso.example.com/api/auth/verify' });
  *   // or with inactivity timeout:
  *   const sso = createSSOClient({ verifyUrl: '...', inactivityTimeout: 5 * 60 * 60 * 1000 });
  */
@@ -20,8 +20,8 @@ export interface SSOSession {
 }
 
 export interface SSOClientConfig {
-  /** URL of the SSO login page. Defaults to 'https://user.danieltech.dev'. */
-  ssoUrl?: string;
+  /** URL of the SSO login page. Required. */
+  ssoUrl: string;
   /** URL of the token verification endpoint. Required. */
   verifyUrl: string;
   /** Callback path on the satellite app. Defaults to '/auth/callback'. */
@@ -39,7 +39,6 @@ export interface SSOClientConfig {
 }
 
 const DEFAULTS = {
-  ssoUrl: "https://user.danieltech.dev",
   callbackPath: "/auth/callback",
   sessionDuration: 30 * 24 * 60 * 60 * 1000,
   inactivityTimeout: Infinity,
@@ -79,19 +78,21 @@ export interface SSOClient {
  * @example
  * // Minimal — no inactivity timeout
  * const sso = createSSOClient({
- *   verifyUrl: 'https://push.danieltech.dev/api/auth/sso-verify',
+ *   ssoUrl: 'https://sso.example.com',
+ *   verifyUrl: 'https://api.example.com/auth/verify',
  * });
  *
  * @example
  * // With 5-hour inactivity timeout
  * const sso = createSSOClient({
- *   verifyUrl: 'https://push.danieltech.dev/api/auth/sso-verify',
+ *   ssoUrl: 'https://sso.example.com',
+ *   verifyUrl: 'https://api.example.com/auth/verify',
  *   inactivityTimeout: 5 * 60 * 60 * 1000,
  * });
  */
 export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
   const cfg: Required<SSOClientConfig> = {
-    ssoUrl: userConfig.ssoUrl ?? DEFAULTS.ssoUrl,
+    ssoUrl: userConfig.ssoUrl,
     verifyUrl: userConfig.verifyUrl,
     callbackPath: userConfig.callbackPath ?? DEFAULTS.callbackPath,
     sessionDuration: userConfig.sessionDuration ?? DEFAULTS.sessionDuration,

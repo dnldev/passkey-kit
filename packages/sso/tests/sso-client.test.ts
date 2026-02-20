@@ -28,16 +28,17 @@ afterEach(() => {
 
 function makeSSOClient(overrides?: Partial<Parameters<typeof createSSOClient>[0]>): SSOClient {
   return createSSOClient({
-    verifyUrl: "https://push.example.com/api/auth/sso-verify",
+    ssoUrl: "https://sso.example.com",
+    verifyUrl: "https://api.example.com/auth/verify",
     ...overrides,
   });
 }
 
 function seedSession(sso: SSOClient, overrides?: Partial<SSOSession>) {
   const session: SSOSession = {
-    userId: "daniel",
-    name: "Daniel",
-    email: "daniel@test.com",
+    userId: "user-1",
+    name: "Alice",
+    email: "alice@example.com",
     role: "admin",
     token: "jwt-token",
     expires: Date.now() + 1000 * 60 * 60,
@@ -64,7 +65,7 @@ describe("createSSOClient", () => {
 
   it("applies defaults for optional config", () => {
     const sso = makeSSOClient();
-    expect(sso.config.ssoUrl).toBe("https://user.danieltech.dev");
+    expect(sso.config.ssoUrl).toBe("https://sso.example.com");
     expect(sso.config.callbackPath).toBe("/auth/callback");
     expect(sso.config.sessionDuration).toBe(30 * 24 * 60 * 60 * 1000);
     expect(sso.config.inactivityTimeout).toBe(Infinity);
@@ -94,7 +95,7 @@ describe("getSession", () => {
     seedSession(sso);
     const session = sso.getSession();
     expect(session).not.toBeNull();
-    expect(session!.userId).toBe("daniel");
+    expect(session!.userId).toBe("user-1");
   });
 
   it("returns null and clears when session is expired", () => {
@@ -134,7 +135,7 @@ describe("redirectToSSO", () => {
   it("constructs the correct login URL", () => {
     const sso = makeSSOClient();
     sso.redirectToSSO();
-    expect(globalThis.location.href).toContain("https://user.danieltech.dev/login?callbackUrl=");
+    expect(globalThis.location.href).toContain("https://sso.example.com/login?callbackUrl=");
     expect(globalThis.location.href).toContain(encodeURIComponent("https://test.example.com/auth/callback"));
   });
 
@@ -151,17 +152,17 @@ describe("handleSSOCallback", () => {
       ok: true,
       json: async () => ({
         valid: true,
-        user: { id: "heather", name: "Heather", email: "h@test.com", role: "member" },
+        user: { id: "user-2", name: "Bob", email: "bob@example.com", role: "member" },
       }),
     });
     const sso = makeSSOClient();
     const session = await sso.handleSSOCallback("jwt-token");
     expect(session).not.toBeNull();
-    expect(session!.userId).toBe("heather");
+    expect(session!.userId).toBe("user-2");
     expect(session!.role).toBe("member");
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       "sso_session",
-      expect.stringContaining('"userId":"heather"')
+      expect.stringContaining('"userId":"user-2"')
     );
   });
 
