@@ -1,0 +1,25 @@
+{
+  "name": "@passkeykit/sso",
+  "version": "1.0.0",
+  "description": "SSO client for DanielTech satellite apps — session management, activity tracking, and admin elevation",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
