@@ -78,6 +78,33 @@ describe('FileChallengeStore', () => {
     writeFileSync(CHALLENGE_FILE, '{{not valid json!!!');
     await expect(store.save('k1', challenge)).rejects.toThrow();
   });
+
+  it('concurrent saves do not lose data', async () => {
+    const promises = Array.from({ length: 20 }, (_, i) =>
+      store.save(`concurrent-${i}`, { ...challenge, challenge: `c-${i}` })
+    );
+    await Promise.all(promises);
+
+    // All 20 must be retrievable
+    for (let i = 0; i < 20; i++) {
+      const result = await store.consume(`concurrent-${i}`);
+      expect(result).not.toBeNull();
+      expect(result!.challenge).toBe(`c-${i}`);
+    }
+  });
+
+  it('concurrent consume is one-time even under contention', async () => {
+    await store.save('race', challenge);
+
+    const results = await Promise.all([
+      store.consume('race'),
+      store.consume('race'),
+      store.consume('race'),
+    ]);
+
+    const nonNull = results.filter(r => r !== null);
+    expect(nonNull).toHaveLength(1);
+  });
 });
 
 describe('FileCredentialStore', () => {
@@ -155,5 +182,54 @@ describe('FileCredentialStore', () => {
     const { writeFileSync } = await import('fs');
     writeFileSync(CREDENTIAL_FILE, 'GARBAGE{{{{');
     await expect(store.getByUserId('user-file-1')).rejects.toThrow();
+  });
+
+  it('concurrent saves do not lose credentials', async () => {
+    const promises = Array.from({ length: 20 }, (_, i) =>
+      store.save({ ...cred, credentialId: `race-cred-${i}`, name: `Key ${i}` })
+    );
+    await Promise.all(promises);
+
+    const all = await store.getByUserId('user-file-1');
+    expect(all).toHaveLength(20);
+  });
+
+  it('concurrent updateCounter calls serialize correctly', async () => {
+    await store.save(cred);
+
+    // Fire 10 counter updates concurrently — last writer wins, but none are lost
+    const promises = Array.from({ length: 10 }, (_, i) =>
+      store.updateCounter('file-cred-1', i + 1)
+    );
+    await Promise.all(promises);
+
+    const result = await store.getByCredentialId('file-cred-1');
+    // With serialized execution, the final counter is the last one processed (10)
+    expect(result!.counter).toBe(10);
+  });
+
+  it('concurrent delete and save do not corrupt the file', async () => {
+    // Seed 5 credentials
+    for (let i = 0; i < 5; i++) {
+      await store.save({ ...cred, credentialId: `cd-${i}` });
+    }
+
+    // Concurrently delete first 3 and add 3 new ones
+    const ops = [
+      store.delete('cd-0'),
+      store.delete('cd-1'),
+      store.delete('cd-2'),
+      store.save({ ...cred, credentialId: 'new-0' }),
+      store.save({ ...cred, credentialId: 'new-1' }),
+      store.save({ ...cred, credentialId: 'new-2' }),
+    ];
+    await Promise.all(ops);
+
+    const all = await store.getByUserId('user-file-1');
+    // 5 original - 3 deleted + 3 added = 5
+    expect(all).toHaveLength(5);
+    expect(await store.getByCredentialId('cd-0')).toBeNull();
+    expect(await store.getByCredentialId('cd-3')).not.toBeNull();
+    expect(await store.getByCredentialId('new-0')).not.toBeNull();
   });
 });

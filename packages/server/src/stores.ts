@@ -11,6 +11,44 @@ import { dirname } from 'path';
 import type { ChallengeStore, CredentialStore, StoredChallenge, StoredCredential } from './types.js';
 
 // ============================================================
+// Async Mutex — serializes read-modify-write file operations
+// ============================================================
+
+/**
+ * @ai_context Prevents async interleaving of read-modify-write file operations
+ * without blocking the Node.js event loop.
+ *
+ * Each file store instance owns its own AsyncMutex. When a method acquires the
+ * lock, all other callers queue behind it until the holder releases. This turns
+ * concurrent `load() → mutate → persist()` sequences into a serial pipeline,
+ * eliminating the lost-update race condition.
+ */
+class AsyncMutex {
+  private queue: Array<() => void> = [];
+  private locked = false;
+
+  acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      // Hand the lock directly to the next waiter (stays locked)
+      next();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+// ============================================================
 // In-Memory Stores (good for development and single-process)
 // ============================================================
 
@@ -65,10 +103,12 @@ export class MemoryCredentialStore implements CredentialStore {
  * File-based challenge store. Challenges are stored in a JSON file.
  * Auto-cleans expired challenges on every operation.
  *
- * Not suitable for multi-process servers (race conditions on file writes).
+ * Uses an internal async mutex to serialize concurrent read-modify-write
+ * operations within the same process. Not suitable for multi-process servers.
  */
 export class FileChallengeStore implements ChallengeStore {
   private filePath: string;
+  private mutex = new AsyncMutex();
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -97,27 +137,43 @@ export class FileChallengeStore implements ChallengeStore {
   }
 
   async save(key: string, challenge: StoredChallenge): Promise<void> {
-    const data = await this.load();
-    data[key] = challenge;
-    await this.persist(data);
+    await this.mutex.acquire();
+    try {
+      const data = await this.load();
+      data[key] = challenge;
+      await this.persist(data);
+    } finally {
+      this.mutex.release();
+    }
   }
 
   async consume(key: string): Promise<StoredChallenge | null> {
-    const data = await this.load();
-    const challenge = data[key];
-    if (!challenge) return null;
-    delete data[key];
-    await this.persist(data);
-    if (Date.now() > challenge.expiresAt) return null;
-    return challenge;
+    await this.mutex.acquire();
+    try {
+      const data = await this.load();
+      const challenge = data[key];
+      if (!challenge) return null;
+      delete data[key];
+      await this.persist(data);
+      if (Date.now() > challenge.expiresAt) return null;
+      return challenge;
+    } finally {
+      this.mutex.release();
+    }
   }
 }
 
 /**
  * File-based credential store. Credentials stored in a JSON array file.
+ *
+ * Uses an internal async mutex to serialize concurrent read-modify-write
+ * operations within the same process. Read-only operations (getByUserId,
+ * getByCredentialId) also acquire the lock to prevent reading a
+ * partially-written file from a concurrent persist().
  */
 export class FileCredentialStore implements CredentialStore {
   private filePath: string;
+  private mutex = new AsyncMutex();
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -140,30 +196,55 @@ export class FileCredentialStore implements CredentialStore {
   }
 
   async save(credential: StoredCredential): Promise<void> {
-    const data = await this.load();
-    data.push(credential);
-    await this.persist(data);
+    await this.mutex.acquire();
+    try {
+      const data = await this.load();
+      data.push(credential);
+      await this.persist(data);
+    } finally {
+      this.mutex.release();
+    }
   }
 
   async getByUserId(userId: string): Promise<StoredCredential[]> {
-    return (await this.load()).filter(c => c.userId === userId);
+    await this.mutex.acquire();
+    try {
+      return (await this.load()).filter(c => c.userId === userId);
+    } finally {
+      this.mutex.release();
+    }
   }
 
   async getByCredentialId(credentialId: string): Promise<StoredCredential | null> {
-    return (await this.load()).find(c => c.credentialId === credentialId) ?? null;
+    await this.mutex.acquire();
+    try {
+      return (await this.load()).find(c => c.credentialId === credentialId) ?? null;
+    } finally {
+      this.mutex.release();
+    }
   }
 
   async updateCounter(credentialId: string, newCounter: number): Promise<void> {
-    const data = await this.load();
-    const cred = data.find(c => c.credentialId === credentialId);
-    if (cred) {
-      cred.counter = newCounter;
-      await this.persist(data);
+    await this.mutex.acquire();
+    try {
+      const data = await this.load();
+      const cred = data.find(c => c.credentialId === credentialId);
+      if (cred) {
+        cred.counter = newCounter;
+        await this.persist(data);
+      }
+    } finally {
+      this.mutex.release();
     }
   }
 
   async delete(credentialId: string): Promise<void> {
-    const data = (await this.load()).filter(c => c.credentialId !== credentialId);
-    await this.persist(data);
+    await this.mutex.acquire();
+    try {
+      const data = (await this.load()).filter(c => c.credentialId !== credentialId);
+      await this.persist(data);
+    } finally {
+      this.mutex.release();
+    }
   }
 }
