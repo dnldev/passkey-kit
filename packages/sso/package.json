@@ -1,6 +1,6 @@
 {
   "name": "@passkeykit/sso",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Configurable SSO client for browser-based apps — session management, activity tracking, and admin elevation",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,10 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "README.md"],
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "prepublishOnly": "npm run build"
@@ -21,7 +24,13 @@
     "url": "https://github.com/dnldev/passkey-kit.git",
     "directory": "packages/sso"
   },
-  "keywords": ["sso", "passkey", "webauthn", "session", "authentication"],
+  "keywords": [
+    "sso",
+    "passkey",
+    "webauthn",
+    "session",
+    "authentication"
+  ],
   "license": "MIT",
   "publishConfig": {
     "access": "public"
