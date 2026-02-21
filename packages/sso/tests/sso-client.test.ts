@@ -12,6 +12,12 @@ const localStorageMock = {
 // Mock fetch
 const fetchMock = vi.fn();
 
+const documentMock = {
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  visibilityState: "visible" as DocumentVisibilityState,
+};
+
 beforeEach(() => {
   Object.keys(store).forEach(k => delete store[k]);
   vi.stubGlobal("localStorage", localStorageMock);
@@ -19,6 +25,7 @@ beforeEach(() => {
   vi.stubGlobal("location", { origin: "https://test.example.com", href: "" });
   vi.stubGlobal("addEventListener", vi.fn());
   vi.stubGlobal("removeEventListener", vi.fn());
+  vi.stubGlobal("document", documentMock);
   vi.clearAllMocks();
 });
 
@@ -204,8 +211,10 @@ describe("activity tracking", () => {
     expect(globalThis.addEventListener).toHaveBeenCalledWith("pointerdown", expect.any(Function));
     expect(globalThis.addEventListener).toHaveBeenCalledWith("keydown", expect.any(Function));
     expect(globalThis.addEventListener).toHaveBeenCalledWith("scroll", expect.any(Function), { passive: true });
+    expect(documentMock.addEventListener).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
     cleanup();
     expect(globalThis.removeEventListener).toHaveBeenCalledTimes(3);
+    expect(documentMock.removeEventListener).toHaveBeenCalledWith("visibilitychange", expect.any(Function));
   });
 });
 

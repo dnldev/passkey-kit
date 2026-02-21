@@ -205,6 +205,16 @@ class RedisChallengeStore implements ChallengeStore {
 
 In **stateless mode**, you don't need a `ChallengeStore` at all — just set `encryptionKey`.
 
+## Security Considerations
+
+### Stateless WebAuthn Replay Trade-off
+
+When using stateless mode (`encryptionKey`), the `challengeToken` is a self-contained encrypted token. The server does not track single-use consumption — once issued, a token is valid until its expiry (default: 5 minutes).
+
+Replay attacks within this window are safely mitigated natively by WebAuthn's `signatureCounter` validation, which is enforced by `@simplewebauthn/server`: an authenticator's counter must strictly increase on each use, so a replayed assertion with a stale counter is rejected at the protocol level.
+
+Developers choosing stateless mode should understand this architectural shift: challenge uniqueness is guaranteed by the authenticator (via counter), not by server-side consumption tracking. If your threat model requires immediate server-side challenge revocation, use stateful mode with a `ChallengeStore` instead.
+
 ## Configuration
 
 ```typescript

@@ -180,14 +180,19 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
       timer = setTimeout(() => { timer = null; }, 30_000);
       touchActivity();
     };
+    const visibilityHandler = () => {
+      if (document.visibilityState === 'hidden') touchActivity();
+    };
     touchActivity();
     globalThis.addEventListener("pointerdown", handler);
     globalThis.addEventListener("keydown", handler);
     globalThis.addEventListener("scroll", handler, { passive: true });
+    document.addEventListener("visibilitychange", visibilityHandler);
     return () => {
       globalThis.removeEventListener("pointerdown", handler);
       globalThis.removeEventListener("keydown", handler);
       globalThis.removeEventListener("scroll", handler);
+      document.removeEventListener("visibilitychange", visibilityHandler);
     };
   }
 

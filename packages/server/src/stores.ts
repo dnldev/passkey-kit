@@ -32,6 +32,9 @@ class AsyncMutex {
       this.locked = true;
       return Promise.resolve();
     }
+    if (this.queue.length >= 1000) {
+      return Promise.reject(new Error('Store Busy: Mutex queue limit exceeded'));
+    }
     return new Promise<void>((resolve) => {
       this.queue.push(resolve);
     });
