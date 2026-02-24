@@ -8,6 +8,17 @@
  * Usage:
  *   const routes = createExpressRoutes(passkeyServer, { getUserInfo });
  *   app.use('/api/auth/passkey', routes);
+ *
+ * CORS and cookies: this module does NOT configure CORS or session cookies.
+ * The caller (e.g., push-service's app.ts) must configure CORS with
+ * `credentials: true` and appropriate origin allowlist. Without this,
+ * cross-origin passkey requests from SPAs will be blocked by the browser.
+ *
+ * Stateless vs stateful mode: if the PasskeyServer was initialized with
+ * `encryptionKey`, the challenge is an opaque token returned to the client.
+ * If initialized with `challengeStore`, challenges are server-side. The route
+ * behavior is identical from the caller's perspective — the mode is an
+ * implementation detail of PasskeyServer.
  */
 
 import { Router } from 'express';
