@@ -47,6 +47,37 @@ const DEFAULTS = {
   elevationDuration: 15 * 60 * 1000,
 } as const;
 
+// ── Safe storage abstraction ───────────────────────────────────────────────────
+// In Safari Private Browsing and environments with blocked storage, accessing
+// localStorage throws a DOMException. This abstraction falls back to an
+// in-memory map so the SPA does not crash.
+
+const inMemoryStorage = new Map<string, string>();
+
+function safeStorageGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return inMemoryStorage.get(key) ?? null;
+  }
+}
+
+function safeStorageSet(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    inMemoryStorage.set(key, value);
+  }
+}
+
+function safeStorageRemove(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    inMemoryStorage.delete(key);
+  }
+}
+
 export interface SSOClient {
   /** Get the current session, or null if expired/inactive. */
   getSession(): SSOSession | null;
@@ -104,7 +135,7 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
 
   function getSession(): SSOSession | null {
     try {
-      const raw = localStorage.getItem(cfg.sessionKey);
+      const raw = safeStorageGet(cfg.sessionKey);
       if (!raw) return null;
       const session: SSOSession = JSON.parse(raw);
 
@@ -116,7 +147,7 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
 
       // Inactivity check
       if (cfg.inactivityTimeout !== Infinity && cfg.inactivityTimeout > 0) {
-        const last = localStorage.getItem(cfg.activityKey);
+        const last = safeStorageGet(cfg.activityKey);
         if (last && Date.now() - Number(last) > cfg.inactivityTimeout) {
           clearSession();
           return null;
@@ -131,8 +162,8 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
   }
 
   function clearSession(): void {
-    localStorage.removeItem(cfg.sessionKey);
-    localStorage.removeItem(cfg.activityKey);
+    safeStorageRemove(cfg.sessionKey);
+    safeStorageRemove(cfg.activityKey);
   }
 
   function redirectToSSO(): void {
@@ -162,7 +193,7 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
         expires: Date.now() + cfg.sessionDuration,
       };
 
-      localStorage.setItem(cfg.sessionKey, JSON.stringify(session));
+      safeStorageSet(cfg.sessionKey, JSON.stringify(session));
       return session;
     } catch {
       return null;
@@ -170,7 +201,7 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
   }
 
   function touchActivity(): void {
-    localStorage.setItem(cfg.activityKey, String(Date.now()));
+    safeStorageSet(cfg.activityKey, String(Date.now()));
   }
 
   function startActivityTracking(): () => void {
@@ -207,21 +238,21 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
   function elevateSession(): void {
     const session = getSession();
     if (!session || session.role !== "admin") return;
-    localStorage.setItem("sso_elevate_pending", "true");
+    safeStorageSet("sso_elevate_pending", "true");
     const callbackUrl = `${globalThis.location.origin}${cfg.callbackPath}`;
     const loginUrl = `${cfg.ssoUrl}/login?callbackUrl=${encodeURIComponent(callbackUrl)}`;
     globalThis.location.href = loginUrl;
   }
 
   function completeElevation(): boolean {
-    const pending = localStorage.getItem("sso_elevate_pending");
-    localStorage.removeItem("sso_elevate_pending");
+    const pending = safeStorageGet("sso_elevate_pending");
+    safeStorageRemove("sso_elevate_pending");
     if (!pending) return false;
     const session = getSession();
     if (!session || session.role !== "admin") return false;
     session.elevated = true;
     session.elevatedUntil = Date.now() + cfg.elevationDuration;
-    localStorage.setItem(cfg.sessionKey, JSON.stringify(session));
+    safeStorageSet(cfg.sessionKey, JSON.stringify(session));
     return true;
   }
 
@@ -230,7 +261,7 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
     if (!session) return;
     session.elevated = false;
     session.elevatedUntil = undefined;
-    localStorage.setItem(cfg.sessionKey, JSON.stringify(session));
+    safeStorageSet(cfg.sessionKey, JSON.stringify(session));
   }
 
   return {
