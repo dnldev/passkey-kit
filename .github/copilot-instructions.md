@@ -30,3 +30,15 @@ npm test       # Vitest
 npm run build  # TypeScript compile
 ```
 Direct push to `main`.
+
+## @ai_context Mandate
+Every complex or non-obvious file must include a `/** @ai_context */` block comment explaining WHY, not HOW. Document architectural decisions, external constraints, cross-file dependencies, and "never do X because Y" warnings.
+
+Pattern:
+```typescript
+/**
+ * @ai_context <explain the why, not the how>
+ * Key constraints: ...
+ * Cross-dependencies: ...
+ */
+```

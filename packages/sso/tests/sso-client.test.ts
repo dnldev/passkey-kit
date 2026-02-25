@@ -287,3 +287,99 @@ describe("handleSSOCallback session duration", () => {
     expect(session!.expires).toBeLessThanOrEqual(Date.now() + duration);
   });
 });
+
+// ── localStorage private-browsing fallback ────────────────────────────────────
+// In Safari Private Browsing and strict privacy environments, ALL localStorage
+// calls throw a DOMException. The SSO client must degrade gracefully.
+
+describe("localStorage private-browsing fallback", () => {
+  function makeThrowingStorage() {
+    return {
+      getItem: vi.fn(() => { throw new DOMException("Storage unavailable", "SecurityError"); }),
+      setItem: vi.fn(() => { throw new DOMException("Storage unavailable", "SecurityError"); }),
+      removeItem: vi.fn(() => { throw new DOMException("Storage unavailable", "SecurityError"); }),
+    };
+  }
+
+  it("getSession returns null without throwing when localStorage is blocked", () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    const sso = makeSSOClient();
+    expect(() => sso.getSession()).not.toThrow();
+    expect(sso.getSession()).toBeNull();
+  });
+
+  it("clearSession does not throw when localStorage is blocked", () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    const sso = makeSSOClient();
+    expect(() => sso.clearSession()).not.toThrow();
+  });
+
+  it("touchActivity does not throw when localStorage is blocked", () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    const sso = makeSSOClient();
+    expect(() => sso.touchActivity()).not.toThrow();
+  });
+
+  it("handleSSOCallback returns the session without throwing when localStorage is blocked", async () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        valid: true,
+        user: { id: "pvt-user", name: "Private", email: "p@p.com", role: "member" },
+      }),
+    });
+    const sso = makeSSOClient();
+    const session = await sso.handleSSOCallback("token");
+    expect(session).not.toBeNull();
+    expect(session!.userId).toBe("pvt-user");
+  });
+
+  it("getSession reads from in-memory fallback after handleSSOCallback stores it there", async () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        valid: true,
+        user: { id: "mem-user", name: "Memory", email: "m@m.com", role: "member" },
+      }),
+    });
+    // Each createSSOClient call creates an isolated in-memory fallback (closure)
+    const sso = makeSSOClient();
+    await sso.handleSSOCallback("token");
+    const session = sso.getSession();
+    expect(session).not.toBeNull();
+    expect(session!.userId).toBe("mem-user");
+  });
+
+  it("completeElevation does not throw when localStorage is blocked", () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    const sso = makeSSOClient();
+    expect(() => sso.completeElevation()).not.toThrow();
+  });
+
+  it("stepDown does not throw when localStorage is blocked", () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    const sso = makeSSOClient();
+    expect(() => sso.stepDown()).not.toThrow();
+  });
+
+  it("two SSO client instances have independent in-memory fallbacks", async () => {
+    vi.stubGlobal("localStorage", makeThrowingStorage());
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        valid: true,
+        user: { id: "user-a", name: "User A", email: "a@a.com", role: "member" },
+      }),
+    });
+    const ssoA = makeSSOClient();
+    const ssoB = makeSSOClient();
+
+    await ssoA.handleSSOCallback("token-a");
+
+    // ssoA has a session in its private fallback; ssoB does not
+    expect(ssoA.getSession()).not.toBeNull();
+    expect(ssoB.getSession()).toBeNull();
+  });
+});
