@@ -49,34 +49,12 @@ const DEFAULTS = {
 
 // ── Safe storage abstraction ───────────────────────────────────────────────────
 // In Safari Private Browsing and environments with blocked storage, accessing
-// localStorage throws a DOMException. This abstraction falls back to an
-// in-memory map so the SPA does not crash.
-
-const inMemoryStorage = new Map<string, string>();
-
-function safeStorageGet(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return inMemoryStorage.get(key) ?? null;
-  }
-}
-
-function safeStorageSet(key: string, value: string): void {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    inMemoryStorage.set(key, value);
-  }
-}
-
-function safeStorageRemove(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch {
-    inMemoryStorage.delete(key);
-  }
-}
+// localStorage throws a DOMException. The safe helpers below catch that and fall
+// back to an in-memory map so the SPA never crashes.
+//
+// NOTE: the fallback map lives INSIDE createSSOClient (closure), not at module
+// scope, so every client instance is fully isolated — important for testing and
+// for apps that create multiple clients.
 
 export interface SSOClient {
   /** Get the current session, or null if expired/inactive. */
@@ -133,6 +111,31 @@ export function createSSOClient(userConfig: SSOClientConfig): SSOClient {
     elevationDuration: userConfig.elevationDuration ?? DEFAULTS.elevationDuration,
   };
 
+  const inMemoryFallback = new Map<string, string>();
+
+  function safeStorageGet(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return inMemoryFallback.get(key) ?? null;
+    }
+  }
+
+  function safeStorageSet(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      inMemoryFallback.set(key, value);
+    }
+  }
+
+  function safeStorageRemove(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      inMemoryFallback.delete(key);
+    }
+  }
   function getSession(): SSOSession | null {
     try {
       const raw = safeStorageGet(cfg.sessionKey);
