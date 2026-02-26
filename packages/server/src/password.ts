@@ -37,13 +37,13 @@ export interface ScryptOptions {
 // --- Base64 helpers (no Buffer dependency) ---
 
 function uint8ToBase64(buf: Uint8Array): string {
-  const binStr = Array.from(buf, b => String.fromCharCode(b)).join('');
+  const binStr = Array.from(buf, b => String.fromCodePoint(b)).join('');
   return btoa(binStr);
 }
 
 function base64ToUint8(str: string): Uint8Array {
   const binStr = atob(str);
-  return Uint8Array.from(binStr, c => c.charCodeAt(0));
+  return Uint8Array.from(binStr, c => c.codePointAt(0)!);
 }
 
 /**
@@ -53,8 +53,8 @@ function base64ToUint8(str: string): Uint8Array {
 function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
   if (a.length !== b.length) return false;
   let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a[i]! ^ b[i]!;
+  for (const [index, byteValue] of a.entries()) {
+    result |= byteValue ^ b[index]!;
   }
   return result === 0;
 }
@@ -121,9 +121,9 @@ function parsePhc(phc: string): { N: number; r: number; p: number; salt: Uint8Ar
   if (!match) return null;
 
   return {
-    N: 2 ** parseInt(match[1], 10),
-    r: parseInt(match[2], 10),
-    p: parseInt(match[3], 10),
+    N: 2 ** Number.parseInt(match[1], 10),
+    r: Number.parseInt(match[2], 10),
+    p: Number.parseInt(match[3], 10),
     salt: base64ToUint8(match[4]),
     hash: base64ToUint8(match[5]),
   };

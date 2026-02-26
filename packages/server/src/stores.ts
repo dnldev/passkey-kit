@@ -5,9 +5,9 @@
  * and CredentialStore interfaces with a shared backend (Redis, database, etc).
  */
 
-import { readFile, writeFile } from 'fs/promises';
-import { mkdirSync, existsSync } from 'fs';
-import { dirname } from 'path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { mkdirSync, existsSync } from 'node:fs';
+import path from 'node:path';
 import type { ChallengeStore, CredentialStore, StoredChallenge, StoredCredential } from './types.js';
 
 // ============================================================
@@ -102,6 +102,11 @@ export class MemoryCredentialStore implements CredentialStore {
 // File-Based Stores (good for single-server, persistent)
 // ============================================================
 
+function ensureParentDirectoryExists(filePath: string): void {
+  const directory = path.dirname(filePath);
+  if (!existsSync(directory)) mkdirSync(directory, { recursive: true });
+}
+
 /**
  * File-based challenge store. Challenges are stored in a JSON file.
  * Auto-cleans expired challenges on every operation.
@@ -115,19 +120,18 @@ export class FileChallengeStore implements ChallengeStore {
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    ensureParentDirectoryExists(filePath);
   }
 
   private async load(): Promise<Record<string, StoredChallenge>> {
     try {
-      const raw = await readFile(this.filePath, 'utf-8');
+      const raw = await readFile(this.filePath, 'utf8');
       return JSON.parse(raw);
-    } catch (err: any) {
+    } catch (error: unknown) {
       // File not yet created — valid initial state
-      if (err?.code === 'ENOENT') return {};
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return {};
       // Anything else (permission denied, corrupted JSON) must surface
-      throw err;
+      throw error;
     }
   }
 
@@ -180,17 +184,16 @@ export class FileCredentialStore implements CredentialStore {
 
   constructor(filePath: string) {
     this.filePath = filePath;
-    const dir = dirname(filePath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    ensureParentDirectoryExists(filePath);
   }
 
   private async load(): Promise<StoredCredential[]> {
     try {
-      const raw = await readFile(this.filePath, 'utf-8');
+      const raw = await readFile(this.filePath, 'utf8');
       return JSON.parse(raw);
-    } catch (err: any) {
-      if (err?.code === 'ENOENT') return [];
-      throw err;
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return [];
+      throw error;
     }
   }
 
@@ -212,7 +215,8 @@ export class FileCredentialStore implements CredentialStore {
   async getByUserId(userId: string): Promise<StoredCredential[]> {
     await this.mutex.acquire();
     try {
-      return (await this.load()).filter(c => c.userId === userId);
+      const credentials = await this.load();
+      return credentials.filter(c => c.userId === userId);
     } finally {
       this.mutex.release();
     }
@@ -221,7 +225,8 @@ export class FileCredentialStore implements CredentialStore {
   async getByCredentialId(credentialId: string): Promise<StoredCredential | null> {
     await this.mutex.acquire();
     try {
-      return (await this.load()).find(c => c.credentialId === credentialId) ?? null;
+      const credentials = await this.load();
+      return credentials.find(c => c.credentialId === credentialId) ?? null;
     } finally {
       this.mutex.release();
     }
@@ -244,8 +249,9 @@ export class FileCredentialStore implements CredentialStore {
   async delete(credentialId: string): Promise<void> {
     await this.mutex.acquire();
     try {
-      const data = (await this.load()).filter(c => c.credentialId !== credentialId);
-      await this.persist(data);
+      const credentials = await this.load();
+      const remaining = credentials.filter(c => c.credentialId !== credentialId);
+      await this.persist(remaining);
     } finally {
       this.mutex.release();
     }

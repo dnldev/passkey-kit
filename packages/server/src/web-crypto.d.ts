@@ -13,12 +13,12 @@ interface Crypto {
 }
 
 interface SubtleCrypto {
-  encrypt(algorithm: AlgorithmIdentifier | AesGcmParams, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
-  decrypt(algorithm: AlgorithmIdentifier | AesGcmParams, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
+  encrypt(algorithm: string | AesGcmParams, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
+  decrypt(algorithm: string | AesGcmParams, key: CryptoKey, data: BufferSource): Promise<ArrayBuffer>;
   importKey(
     format: 'raw',
     keyData: BufferSource,
-    algorithm: AlgorithmIdentifier | HkdfParams | string,
+    algorithm: string | HkdfParams,
     extractable: boolean,
     keyUsages: KeyUsage[],
   ): Promise<CryptoKey>;
@@ -62,5 +62,4 @@ interface HkdfParams {
 }
 
 type KeyUsage = 'encrypt' | 'decrypt' | 'sign' | 'verify' | 'deriveKey' | 'deriveBits' | 'wrapKey' | 'unwrapKey';
-type AlgorithmIdentifier = string;
 type BufferSource = ArrayBufferView | ArrayBuffer;
