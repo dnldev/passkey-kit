@@ -22,7 +22,7 @@ export async function hashPassword(
 ): Promise<string> {
   return argon2.hash(password, {
     type: argon2.argon2id,
-    memoryCost: options?.memoryCost ?? 65536,
+    memoryCost: options?.memoryCost ?? 65_536,
     timeCost: options?.timeCost ?? 3,
     parallelism: options?.parallelism ?? 4,
   });
@@ -44,7 +44,7 @@ export function needsRehash(
   },
 ): boolean {
   return argon2.needsRehash(storedHash, {
-    memoryCost: options?.memoryCost ?? 65536,
+    memoryCost: options?.memoryCost ?? 65_536,
     timeCost: options?.timeCost ?? 3,
     parallelism: options?.parallelism ?? 4,
   });

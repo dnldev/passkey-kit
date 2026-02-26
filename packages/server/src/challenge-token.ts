@@ -60,15 +60,19 @@ async function deriveKey(secret: string): Promise<CryptoKey> {
 // --- Base64url helpers (no Buffer dependency) ---
 
 function toBase64Url(buf: Uint8Array): string {
-  const binStr = Array.from(buf, b => String.fromCharCode(b)).join('');
-  return btoa(binStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  const binStr = Array.from(buf, b => String.fromCodePoint(b)).join('');
+  const base64 = btoa(binStr).replaceAll('+', '-').replaceAll('/', '_');
+  // Remove padding characters — base64url uses no padding
+  let end = base64.length;
+  while (end > 0 && base64[end - 1] === '=') end--;
+  return base64.slice(0, end);
 }
 
 function fromBase64Url(str: string): Uint8Array {
-  const padded = str.replace(/-/g, '+').replace(/_/g, '/') +
+  const padded = str.replaceAll('-', '+').replaceAll('_', '/') +
     '='.repeat((4 - (str.length % 4)) % 4);
   const binStr = atob(padded);
-  return Uint8Array.from(binStr, c => c.charCodeAt(0));
+  return Uint8Array.from(binStr, c => c.codePointAt(0)!);
 }
 
 /**

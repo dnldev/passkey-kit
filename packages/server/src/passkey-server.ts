@@ -41,6 +41,8 @@ import type {
 } from './types.js';
 import { sealChallengeToken, openChallengeToken } from './challenge-token.js';
 
+type VerificationRequirement = 'required' | 'preferred' | 'discouraged';
+
 const DEFAULT_CHALLENGE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export class PasskeyServer {
@@ -76,8 +78,8 @@ export class PasskeyServer {
    */
   async generateRegistrationOptions(user: UserInfo, opts?: {
     authenticatorAttachment?: 'platform' | 'cross-platform';
-    residentKey?: 'required' | 'preferred' | 'discouraged';
-    userVerification?: 'required' | 'preferred' | 'discouraged';
+    residentKey?: VerificationRequirement;
+    userVerification?: VerificationRequirement;
   }) {
     const existingCredentials = await this.credentialStore.getByUserId(user.id);
 
@@ -137,23 +139,7 @@ export class PasskeyServer {
     credentialName?: string,
     challengeToken?: string,
   ): Promise<RegistrationResult> {
-    let expectedChallenge: string;
-
-    if (this.challengeStore) {
-      const storedChallenge = await this.challengeStore.consume(userId);
-      if (!storedChallenge) throw new Error('Challenge not found or expired');
-      if (storedChallenge.type !== 'registration') throw new Error('Challenge type mismatch');
-      if (Date.now() > storedChallenge.expiresAt) throw new Error('Challenge expired');
-      expectedChallenge = storedChallenge.challenge;
-    } else {
-      if (!challengeToken) throw new Error('challengeToken is required in stateless mode');
-      const payload = await openChallengeToken(challengeToken, this.encryptionKey!);
-      if (!payload) throw new Error('Invalid or expired challenge token');
-      if (payload.type !== 'registration') throw new Error('Challenge type mismatch');
-      if (payload.userId !== userId) throw new Error('Challenge userId mismatch');
-      expectedChallenge = payload.challenge;
-    }
-
+    const expectedChallenge = await this.resolveRegistrationChallenge(userId, challengeToken);
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge,
@@ -188,7 +174,7 @@ export class PasskeyServer {
    * If not provided, uses discoverable credentials (resident keys).
    */
   async generateAuthenticationOptions(userId?: string, opts?: {
-    userVerification?: 'required' | 'preferred' | 'discouraged';
+    userVerification?: VerificationRequirement;
   }) {
     let allowCredentials: { id: string; transports?: AuthenticatorTransportFuture[] }[] | undefined;
 
@@ -288,5 +274,21 @@ export class PasskeyServer {
       verified: true,
       newCounter,
     };
+  }
+
+  private async resolveRegistrationChallenge(userId: string, challengeToken?: string): Promise<string> {
+    if (this.challengeStore) {
+      const storedChallenge = await this.challengeStore.consume(userId);
+      if (!storedChallenge) throw new Error('Challenge not found or expired');
+      if (storedChallenge.type !== 'registration') throw new Error('Challenge type mismatch');
+      if (Date.now() > storedChallenge.expiresAt) throw new Error('Challenge expired');
+      return storedChallenge.challenge;
+    }
+    if (!challengeToken) throw new Error('challengeToken is required in stateless mode');
+    const payload = await openChallengeToken(challengeToken, this.encryptionKey!);
+    if (!payload) throw new Error('Invalid or expired challenge token');
+    if (payload.type !== 'registration') throw new Error('Challenge type mismatch');
+    if (payload.userId !== userId) throw new Error('Challenge userId mismatch');
+    return payload.challenge;
   }
 }

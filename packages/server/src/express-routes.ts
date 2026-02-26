@@ -26,6 +26,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { PasskeyServer } from './passkey-server.js';
 import type { UserInfo } from './types.js';
+import type { RegistrationResponseJSON, AuthenticationResponseJSON } from '@simplewebauthn/server';
 
 // ============================================================
 // Zod Schemas — strict input validation for every route
@@ -127,8 +128,8 @@ export function createExpressRoutes(
       });
 
       res.json(options);
-    } catch (err) {
-      console.error('[passkey-kit] Registration options error:', err);
+    } catch (error) {
+      console.error('[passkey-kit] Registration options error:', error);
       res.status(500).json({ error: 'Failed to generate registration options' });
     }
   });
@@ -142,7 +143,7 @@ export function createExpressRoutes(
       }
       const { userId, response, credentialName, challengeToken } = parsed.data;
 
-      const result = await server.verifyRegistration(userId, response as any, credentialName, challengeToken);
+      const result = await server.verifyRegistration(userId, response as unknown as RegistrationResponseJSON, credentialName, challengeToken);
 
       if (config.onRegistrationSuccess) {
         await config.onRegistrationSuccess(userId, result.credential.credentialId);
@@ -153,9 +154,9 @@ export function createExpressRoutes(
         credentialId: result.credential.credentialId,
         credentialName: result.credential.name,
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Verification failed';
-      console.error('[passkey-kit] Registration verify error:', err);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Verification failed';
+      console.error('[passkey-kit] Registration verify error:', error);
       res.status(400).json({ error: message });
     }
   });
@@ -175,8 +176,8 @@ export function createExpressRoutes(
       );
 
       res.json({ options, sessionKey, challengeToken });
-    } catch (err) {
-      console.error('[passkey-kit] Authentication options error:', err);
+    } catch (error) {
+      console.error('[passkey-kit] Authentication options error:', error);
       res.status(500).json({ error: 'Failed to generate authentication options' });
     }
   });
@@ -190,7 +191,7 @@ export function createExpressRoutes(
       }
       const { sessionKey, response } = parsed.data;
 
-      const result = await server.verifyAuthentication(sessionKey, response as any);
+      const result = await server.verifyAuthentication(sessionKey, response as unknown as AuthenticationResponseJSON);
 
       let extra: Record<string, unknown> = {};
       if (config.onAuthenticationSuccess) {
@@ -203,9 +204,9 @@ export function createExpressRoutes(
         credentialId: result.credentialId,
         ...extra,
       });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Verification failed';
-      console.error('[passkey-kit] Authentication verify error:', err);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Verification failed';
+      console.error('[passkey-kit] Authentication verify error:', error);
       res.status(400).json({ error: message });
     }
   });

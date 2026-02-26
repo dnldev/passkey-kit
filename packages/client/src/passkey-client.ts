@@ -18,6 +18,8 @@ import {
 } from '@simplewebauthn/browser';
 import { PasskeyError } from './errors.js';
 
+type VerificationRequirement = 'required' | 'preferred' | 'discouraged';
+
 export interface PasskeyClientConfig {
   /**
    * Base URL of the passkey server routes.
@@ -68,10 +70,10 @@ export class PasskeyClient {
         },
         body: JSON.stringify(mergedBody),
       });
-    } catch (err) {
+    } catch (error) {
       throw new PasskeyError(
         'NETWORK_ERROR',
-        err instanceof Error ? err.message : 'Network request failed',
+        error instanceof Error ? error.message : 'Network request failed',
       );
     }
     const data = await res.json();
@@ -98,8 +100,8 @@ export class PasskeyClient {
     credentialName?: string,
     opts?: {
       authenticatorAttachment?: 'platform' | 'cross-platform';
-      residentKey?: 'required' | 'preferred' | 'discouraged';
-      userVerification?: 'required' | 'preferred' | 'discouraged';
+      residentKey?: VerificationRequirement;
+      userVerification?: VerificationRequirement;
     },
   ): Promise<{ verified: boolean; credentialId: string; credentialName: string }> {
     // Step 1: Get registration options from server
@@ -116,8 +118,8 @@ export class PasskeyClient {
     let attestationResponse;
     try {
       attestationResponse = await startRegistration(options);
-    } catch (err) {
-      throw PasskeyError.fromWebAuthnError(err);
+    } catch (error) {
+      throw PasskeyError.fromWebAuthnError(error);
     }
 
     // Step 3: Send attestation to server for verification
@@ -154,8 +156,8 @@ export class PasskeyClient {
     let assertionResponse;
     try {
       assertionResponse = await startAuthentication(options);
-    } catch (err) {
-      throw PasskeyError.fromWebAuthnError(err);
+    } catch (error) {
+      throw PasskeyError.fromWebAuthnError(error);
     }
 
     // Step 3: Send assertion to server for verification (sessionKey IS the challengeToken in stateless mode)
