@@ -1,0 +1,25 @@
+{
+  "$schema": "https://stryker-mutator.io/schemas/stryker-schema.json#",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+  "mutate": [
+    "packages/server/src/challenge-token.ts",
+    "packages/server/src/passkey-server.ts",
+    "packages/server/src/password.ts",
+    "packages/server/src/stores.ts",
+    "packages/client/src/passkey-client.ts"
+  ],
+  "reporters": ["progress", "clear-text", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+  "timeoutMS": 30000,
+  "concurrency": 4
+}

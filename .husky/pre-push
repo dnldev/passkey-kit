@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+echo "→ Checking architecture (dependency-cruiser)..."
+npm run analyze:deps -- --output-type text 2>&1 | head -60 || true
+echo "→ Checking for dead code (knip)..."
+npm run analyze:deadcode -- --no-exit-code 2>&1 | head -60 || true
