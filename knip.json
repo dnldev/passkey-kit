@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "ignoreDependencies": [
+    "@secretlint/secretlint-rule-preset-recommend"
+  ],
+  "workspaces": {
+    "packages/*": {
+      "entry": [
+        "src/index.ts"
+      ]
+    }
+  }
+}
