@@ -10,7 +10,11 @@
     "clean": "rm -rf packages/*/dist",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky",
+    "lint:secrets": "secretlint \"**/*\"",
+    "analyze:deps": "depcruise packages",
+    "analyze:deadcode": "knip"
   },
   "dependencies": {
     "@noble/hashes": "^2.0.1",
@@ -18,12 +22,27 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.3.1",
     "@vitest/coverage-v8": "^4.0.18",
+    "dependency-cruiser": "^17.3.8",
     "eslint": "^10.0.2",
     "eslint-plugin-sonarjs": "^4.0.0",
     "eslint-plugin-unicorn": "^63.0.0",
+    "husky": "^9.1.7",
+    "knip": "^5.85.0",
+    "lint-staged": "^16.3.0",
+    "secretlint": "^11.3.1",
     "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
-  "type": "module"
+  "type": "module",
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*": [
+      "secretlint"
+    ]
+  }
 }
