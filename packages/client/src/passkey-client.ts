@@ -109,15 +109,31 @@ export class PasskeyClient {
       userId,
       userName: credentialName,
       ...opts,
-    })) as Parameters<typeof startRegistration>[0] & { challengeToken?: string };
+    })) as {
+      options?: Parameters<typeof startRegistration>[0];
+      challengeToken?: string;
+    } & Parameters<typeof startRegistration>[0];
 
-    // Extract challengeToken before passing to WebAuthn (it's not a WebAuthn field)
-    const { challengeToken, ...options } = serverResponse;
+    // The server may return WebAuthn options nested under an `options` property
+    // (auth-gateway pattern) or flat at the top level (inline pattern).
+    // Support both by checking for the nested shape first.
+    let registrationOptions: Parameters<typeof startRegistration>[0];
+    let challengeToken: string | undefined;
+
+    if (serverResponse.options && typeof serverResponse.options === 'object' && 'challenge' in serverResponse.options) {
+      registrationOptions = serverResponse.options;
+      challengeToken = serverResponse.challengeToken;
+    } else {
+      const { challengeToken: extractedToken, ...flatOptions } = serverResponse as
+        Parameters<typeof startRegistration>[0] & { challengeToken?: string };
+      registrationOptions = flatOptions;
+      challengeToken = extractedToken;
+    }
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
     let attestationResponse;
     try {
-      attestationResponse = await startRegistration(options);
+      attestationResponse = await startRegistration(registrationOptions);
     } catch (error) {
       throw PasskeyError.fromWebAuthnError(error);
     }
@@ -147,22 +163,41 @@ export class PasskeyClient {
     },
   ): Promise<{ verified: boolean; userId: string; credentialId: string; [key: string]: unknown }> {
     // Step 1: Get authentication options from server
-    const { options, sessionKey } = (await this.post('/authenticate/options', {
+    const serverResponse = (await this.post('/authenticate/options', {
       userId,
       ...opts,
-    })) as { options: Parameters<typeof startAuthentication>[0]; sessionKey: string; challengeToken?: string };
+    })) as {
+      options?: Parameters<typeof startAuthentication>[0];
+      challengeToken?: string;
+      sessionKey?: string;
+    } & Parameters<typeof startAuthentication>[0];
+
+    // Support both nested `{ options, challengeToken }` (auth-gateway) and
+    // legacy `{ options, sessionKey }` response formats.
+    let authenticationOptions: Parameters<typeof startAuthentication>[0];
+    let challengeToken: string | undefined;
+
+    if (serverResponse.options && typeof serverResponse.options === 'object' && 'challenge' in serverResponse.options) {
+      authenticationOptions = serverResponse.options;
+      challengeToken = serverResponse.challengeToken ?? serverResponse.sessionKey;
+    } else {
+      authenticationOptions = serverResponse as Parameters<typeof startAuthentication>[0];
+      challengeToken = serverResponse.challengeToken ?? serverResponse.sessionKey;
+    }
 
     // Step 2: Run WebAuthn ceremony (browser prompt)
     let assertionResponse;
     try {
-      assertionResponse = await startAuthentication(options);
+      assertionResponse = await startAuthentication(authenticationOptions);
     } catch (error) {
       throw PasskeyError.fromWebAuthnError(error);
     }
 
-    // Step 3: Send assertion to server for verification (sessionKey IS the challengeToken in stateless mode)
+    // Step 3: Send assertion to server for verification
+    // Send both field names for compatibility with different server implementations
     const result = await this.post('/authenticate/verify', {
-      sessionKey,
+      challengeToken,
+      sessionKey: challengeToken,
       response: assertionResponse,
     });
 
