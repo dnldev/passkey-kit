@@ -1,6 +1,6 @@
 {
   "name": "@passkeykit/sso",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Configurable SSO client for browser-based apps — session management, activity tracking, and admin elevation",
   "type": "module",
   "main": "dist/index.js",
