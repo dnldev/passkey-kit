@@ -1,9 +1,10 @@
 name: Claude Code Review
 on:
   pull_request:
-    # BP42 D1: opened/reopened/ready_for_review only — NOT synchronize.
-    # One review per PR lifecycle, not one per push. Re-review on demand via @claude.
-    types: [opened, reopened, ready_for_review]
+    # BP42 D1: opened/reopened/ready_for_review only — NOT synchronize (one review
+    # per PR lifecycle, not per push). BP42 D12: 'labeled' adds an on-demand
+    # re-review trigger — add the 'claude-review' label to any PR to (re)run.
+    types: [opened, reopened, ready_for_review, labeled]
     paths-ignore:
       - '**/package-lock.json'
       - '**/pnpm-lock.yaml'
@@ -16,8 +17,11 @@ concurrency:
 
 jobs:
   claude-review:
-    # BP42 D2: skip drafts.
-    if: github.event.pull_request.draft == false
+    # Auto on non-draft open events; on-demand via the 'claude-review' label
+    # (the label path works even on drafts — you asked for it explicitly). BP42 D2/D12.
+    if: |
+      (github.event.action == 'labeled' && github.event.label.name == 'claude-review') ||
+      (github.event.action != 'labeled' && github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     permissions:
       contents: read
