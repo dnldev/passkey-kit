@@ -24,13 +24,13 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Lint
-        run: npx --no eslint packages/*/src/
+        run: npx --no -- eslint packages/*/src/
 
       - name: Typecheck (server)
-        run: npx --no tsc -p packages/server/tsconfig.json --noEmit
+        run: npx --no -- tsc -p packages/server/tsconfig.json --noEmit
 
       - name: Typecheck (client)
-        run: npx --no tsc -p packages/client/tsconfig.json --noEmit
+        run: npx --no -- tsc -p packages/client/tsconfig.json --noEmit
 
       - name: Test
         run: npm test
