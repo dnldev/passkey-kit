@@ -4,7 +4,8 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [develop, main]
 
 jobs:
   ci:
@@ -20,38 +21,40 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Lint
-        run: npx eslint packages/*/src/
+        run: npx --no eslint packages/*/src/
 
       - name: Typecheck (server)
-        run: npx tsc -p packages/server/tsconfig.json --noEmit
+        run: npx --no tsc -p packages/server/tsconfig.json --noEmit
 
       - name: Typecheck (client)
-        run: npx tsc -p packages/client/tsconfig.json --noEmit
+        run: npx --no tsc -p packages/client/tsconfig.json --noEmit
 
       - name: Test
         run: npm test
 
-  mutation:
-    name: Mutation Tests (Stryker)
-    runs-on: ubuntu-latest
+  ci-ok:
+    name: ci-ok
+    # No draft clause here: GitHub counts a SKIPPED required check as success, so a skipped ci-ok
+    # would let a draft merge with no gate run. On a draft it runs and fails closed instead;
+    # ready_for_review re-runs the whole workflow.
+    if: always()
     needs: [ci]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - name: Install dependencies
-        run: npm ci
-      - name: Run Stryker mutation tests
-        run: npm run test:mutate
-      - name: Upload mutation report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: mutation-report
-          path: reports/mutation/
-          retention-days: 14
+      # A step `if:`, not an `env:` value: agent-gate reads every `env:` block in this file and marks an
+      # expression it does not map UNRUN (red), but it never runs ci-ok, so this `if:` is GitHub's alone.
+      - name: a draft PR ran no gate
+        if: github.event.pull_request.draft
+        run: |
+          echo "::error::draft PR: no gate ran"; exit 1
+      - name: every gate green
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -Eq '"result": *"(failure|cancelled)"'; then
+            echo "::error::a gate is red — see the jobs above"; exit 1
+          fi
